@@ -1,0 +1,27 @@
+REQUIREMENTS:
+- scapy-python3 [NO! VEDI SOTTO]
+  sudo pip3 install scapy-python3
+- tcpdump
+  pacaur -S tcpdump
+
+USAGE:
+- requires root permissions. If you would like to try alternative method to avoid root privileges look at: https://stackoverflow.com/questions/36215201/python-scapy-sniff-without-root
+  
+USEFUL RESOURCES:
+- https://github.com/Nekmo/amazon-dash/tree/master
+- https://stackoverflow.com/questions/36215201/python-scapy-sniff-without-root
+- https://github.com/vancetran/amazon-dash-rpi
+
+
+NOTA AMAZON DASH:
+Tenendo premuto il pulsante ci si connette via wifi access point e si va su 192.168.0.1 per avere mac address (e anche seriale, firmware e livello batteria)
+per l'installazione ci vuole app amazon shopping (si mette la wifi, ma non si associa a un prodotto, poi si tolgono le notifiche dash button cosi' evita di rompere ogni volta)
+L'ideale è impostare il router per non far uscire su internet i mac address dei dash button (cosi' non comunicano nemmeno con Amazon)
+
+
+NEW 2019:
+scapy-python3 non esiste più, è stato rinominato in kamene https://github.com/phaethon/kamene
+ora lo scapy ufficiale supporta python3 https://github.com/secdev/scapy
+Installazione: https://scapy.readthedocs.io/en/latest/installation.html
+pip3 install --pre scapy[basic]
+(Non so se serve ancora tcpdump)

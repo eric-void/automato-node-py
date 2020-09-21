@@ -1,0 +1,13 @@
+# Use "pip3 install -r requirements.txt" to install
+# Use "pip3 freeze" to list currently installed packages
+# @see https://pip.pypa.io/en/stable/user_guide/#requirements-files https://pip.pypa.io/en/stable/reference/pip_install/#requirements-file-format
+
+-r requirements.txt
+-r src/automato/modules/astral2-requirements.txt
+-r src/automato/modules/net-requirements.txt
+-r src/automato/modules/http-request-requirements.txt
+-r src/automato/modules/net_sniffer_scapy-requirements.txt
+-r src/automato/modules/notifications-webpush-requirements.txt
+-r src/automato/modules/rf_listener-requirements.txt
+-r src/automato/modules/speedtest-requirements.txt
+-r src/automato/modules/telegram2-requirements.txt

@@ -1,0 +1,14 @@
+# CORE requirements
+# Use "requirements-all.txt" to install also requirements for all modules (core + all modules)
+
+# Use pip3 install -r requirements.txt to install
+# @see https://pip.pypa.io/en/stable/user_guide/#requirements-files https://pip.pypa.io/en/stable/reference/pip_install/#requirements-file-format
+
+# https://github.com/linjackson78/jstyleson
+jstyleson >= 0.0.2
+
+# https://pypi.org/project/croniter/
+croniter >= 0.3.26
+
+# https://github.com/PiotrDabkowski/Js2Py
+# Js2Py >= 0.60

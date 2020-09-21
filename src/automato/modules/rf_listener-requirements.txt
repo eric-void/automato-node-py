@@ -1,0 +1,2 @@
+# https://pypi.org/project/RPi.GPIO/
+RPi.GPIO >= 0.6.5

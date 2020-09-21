@@ -1,0 +1,6 @@
+# requires also "tcpdump" system package installed
+# and sudo permissions (for an alternative look at: https://stackoverflow.com/questions/36215201/python-scapy-sniff-without-root)
+# scapy-python3 >= 0.25
+
+scapy >= 2.4.3
+# backcall-0.1.0 decorator-4.4.1 ipython-7.10.2 ipython-genutils-0.2.0 jedi-0.15.2 parso-0.5.2 pexpect-4.7.0 pickleshare-0.7.5 prompt-toolkit-3.0.2 ptyprocess-0.6.0 pygments-2.5.2 scapy-2.4.3 traitlets-4.3.3 wcwidth-0.1.7

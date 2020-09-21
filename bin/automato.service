@@ -1,0 +1,17 @@
+# Put this (or a link to it) in /etc/systemd/system/
+# see https://wiki.archlinux.org/index.php/Systemd#Writing_unit_files
+# Create an automato user with: useradd -r -s /usr/bin/nologin username
+
+[Unit]
+Description=Automato Node
+After=multi-user.target
+
+[Service]
+Type=idle
+ExecStart=/opt/automato-node-py/bin/automato-node.sh
+StandardOutput=null
+User=automato
+Group=users
+
+[Install]
+WantedBy=multi-user.target

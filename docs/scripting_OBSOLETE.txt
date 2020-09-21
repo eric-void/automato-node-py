@@ -1,0 +1,39 @@
+Uno script è un array di array, dove ogni elemento del primo array è una direttiva da eseguire (una linea di codice, in pratica)
+
+Esempi di script (viene eliminato il primo livello di array per semplicità):
+
+  ["set", "temp1", "payload", "tele/sonoff6/SENSOR[SI7021.Temperature]", "payload", "tele/sonoff6/STATUS10[StatusSNS.SI7021.Temperature]"],
+
+  ["if", "eval", "temp1 is not None and time1 is not None and now - time1 < 600"],
+    ["publish", {"temperature": ["eval", "round(temp1 + 0.3, 1)"], "humidity": ["hum1"], "time": ["time1"], "source": {"temperature": ["temp1"], "humidity": ["hum1"], "time": ["time1"]}}],
+  ["else"],
+    ["notify", ["eval", "'Temperatura interna non rilevata (temp1 invalid: ' + str(temp1) + '° ' + str(time1) + ' ms)'"], "'debug'"],
+
+  ["return", "eval", "'Temperatura esterna: ' + str(payload['temperature']) + '°, umidità: ' + str(payload['humidity']) + '% (lettura del ' + utils.strftime(payload['time']) + ')'"],
+
+  ["set", "auto", true],
+  ["check_auto"],
+
+  ["if", "eval", "not prev_state"], 
+    ["set", "prev_state", "eval", "state"],
+  ["endif"]
+
+  ["if", "eval", "auto"],
+    ["set", "state", "auto"],
+  ["else"],
+    ["if", "eval", "armed"], ["set", "state", "armed"], ["else"], ["set", "state", "disarmed"],
+  # Se alla fine dell'if termina lo script non c'è bisogno di endif
+
+  ["publish", "home/alarm/reason", ["eval", "fire_reason"]],
+
+  ["print('x')"],
+
+Variabili globali a disposizione:
+  - env
+  - utils (per accedere agli helpers in automato.core.utils)
+  - now (timestamp attuale)
+  - hour (ora del giorno attuale)
+
+Package a disposizione:
+  - re
+  - logging

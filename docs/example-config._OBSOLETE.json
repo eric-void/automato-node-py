@@ -1,0 +1,176 @@
+// node-config
+
+
+// Glossario
+// - node: è il servizio complessivo che sta gestendo l'insieme di moduli (questo node-config), e che è localizzato su una macchina. In una rete ce n'è uno per macchina fisica, in genere.
+// - module: è un modulo automato generico, può essere di vari tipi
+// - producer: è un produttore di contenuti mqtt, in genere temporizzato (es: clock, persistence)
+// - consumer: è un ricevitore/consumatore di contenuti mqtt. Esiste?
+// - element?: è un modulo che è sia produttore che consumatore
+// - bridge? injector?: fa da ponte con l'esterno, ed è uno script esterno. Esempio zoneminder-automato-bridge/zoneminder-mqtt-injector
+// - interface? vero bridge?: telegram è una interfaccia alternativa a mqtt. Rispetto a mqtt produce dei comandi (quando gli viene chiesto), e ne riceve come risposta (dandoli all'esterno)
+
+// altro: device, script, object, bot, engine, thing
+
+{
+  "name": "golconda",
+  "description": "...",
+  
+  "mqtt": {
+  },
+  "modules": [
+    {
+      "module": "clock",
+      "config": {
+        "topic_prefix": "home/",
+      },
+    },
+    // TODO Necessita di root oppure di avere "arpscan" in sudoers?
+    {
+      "module": "presence",
+      "config": {
+        "topic_prefix": "home/",
+        "occupants": [
+          { "address": "78:f8:82:cb:42:80", "name": "Eric" },
+          { "address": "b0:e5:ed:b8:89:47", "name": "Letizia" }
+        ],
+      }
+    },
+    // TODO net-utils
+    {
+      "module": "net-utils",
+      "config": {
+        "topic_prefix": "net/",
+      }
+    },
+    // TODO selenium-phantomjs-executor
+    {
+      "module": "selenium-phantomjs-executor", // TODO Un nome migliore?
+      "description": "Disconnect router from the net to renew ip",
+      "subscribe": {
+        "net/iprenew": {
+          "description": "Request the router to disconnect from the network",
+          "response": [ "net/iprenew/result" ]
+        }
+      },
+      "publish": {
+        "net/iprenew/result": {
+          "type": "string",
+          "description": "Status of router disconnection request",
+          "as_string": "Disconnection request status: {value}",
+          // TODO ci potrebbe essere un "as_string_script" che esegue uno script
+        }
+      },
+      "config": {
+        "window_size": [1120, 550],
+        "connect": {
+          "url": "http://192.168.1.1/",
+          "cookie": {"name": "Authorization", "value": "Basic YWRtaW46Vk1JTVFwZzV3YQ==", "path": "/", "secure": false, "domain": "192.168.1.1"},
+          "script": [
+            "element = selenium_wait_form_element_id(driver, 'menu_network')",
+            "if element:",
+            "  element.click()",
+            "  element = selenium_wait_form_element_id(driver, 'disConn')",
+            "  if element:",
+            "    automato.publish('net/iprenew/result', 'disconnecting...')",
+            "    element.click()",
+            "    automato.publish('net/iprenew/result', 'disconnected')",
+            "    return True",
+            "automato.publish('net/iprenew/result', 'error')",
+            "return False",
+          ]
+        },
+      },
+    },
+    // TODO sonoff dovrebbe servire solo per descrivere i sonoff che sono installati per dare gli hint
+    // TODO Potrebbe già gestire le questioni di toggle, timer...
+    {
+      "module": "sonoff", // TODO Che poi sarebbe sonoff-tasmota...
+      "devices": {
+        "sonoff4": {
+          "type": "basic", // Implicito
+          "caption": "Irrigazione",
+          "description": "Permette di accendere e spegnere la pompa dell'acqua del pozzo",
+        },
+        "sonoff5": {
+          "caption": "Telecamere",
+          "description": "Alimentazione delle telecamere esterne",
+          "sensor": "temperature",
+        },
+        "sonoff6": {
+          "caption": "Temperatura camera",
+          "description": "Sensore di temperatura camera",
+          "sensor": "temperature",
+          "hide-toggle": true, // TODO ???
+        }
+      }
+    },
+    
+      
+    
+    
+    
+    // TODO expressions: home/telemetry e external/telemetry
+    // TODO zoneminder-bridge (che necessita di uno script) - potrebbe già essere lui che tiene gli ultimi N eventi - comunque ci vuole un descrittore dentro automato
+    // TODO weather-forecast, meteofa-listener (si possono usare degli html-executor o simili?)
+    // TODO custom: se c'è uno zoneminder alert, e presence è vuoto, fai un notification - potrei mettere comunque un antiflood (generico delle notifications?)
+    // TODO custom: se c'è porta aperta, e presence è vuoto, fai un notification (suona allarme?)
+    // TODO hint per singoli moduli (che dicono come rappresentarli), hint per descrivere i sonoff e come si usano?
+    // TODO custom: se accendo la luce esterna, e rimane accesa troppo la spengo (a meno di non averlo specificato?)
+    // TODO custom: se accendo la luce triggered, dopo X minuti la spengo (a meno di non averlo specificato)
+    // TODO idem per irrigazione
+    // TODO persistor, che prende un evento e lo memorizza, e rilancia gli ultimi N eventi dello stesso tipo?
+    // TODO telegram-listener
+    // TODO notify-changer: che fa una notifica quando un topic cambia di valore (es potrebbe fare una notifica quando persister cambia)
+    
+    
+    
+    // TODO Un sistema base di notifiche che permette di fare un subscribe /notification/subscribe/[topic]/[canale] (specificando "to" nel payload? la mail, o il telegram-id...), e un send /notification/send/[topic]/[canale]
+    // TODO Permette anche di fare uno snooze (per topic/canale/to) per X tempo
+    // TODO E magari ha un antiflood (max X notification di un tipo per tempo, e X notification in generale per tempo, e se si superano raggruppa le notifiche - ci vorrebbe forse un notification alarm che viene mandato SEMPRE)
+    // TODO Ci potrebbe essere anche un "router" delle notifiche: i moduli specificano solo che tipo di notifica fanno, poi se va solo in certi canali e quali lo decide questo router (con dei default)
+    {
+      "module": "notifications",
+      "config": {
+        "topic_prefix": "home/",
+      }
+    },
+    {
+      "module": "web-notifications",
+      "notify-channel": "web", // TODO
+    },
+    {
+      "module": "email-notifications",
+      "notify-channel": "email", // TODO
+    },
+    {
+      "module": "telegram-notifications",
+      "notify-channel": "telegram", // TODO
+    },
+    
+
+    
+    
+    { 
+      "module": "expression",
+      "home/telemetry": {
+        "time": {
+
+        },
+        "temperature": {
+          "#get": ["tele/sonoff6/SENSOR[DHT22.Temperature]", "tele/sonoff6/STATUS10[StatusSNS.DHT22.Temperature]"],
+          "#expr": "round(t1 + 0.3, 1)", // TODO
+          "#if": "t1 is not None and time1 is not None and int(time.time()) - time1 < max_mqtt_time",
+        }
+      }
+    }
+
+    // Kitchen:
+    // TODO rf-receiver: per porta [in kitchen]
+    // TODO sensore di temperatura?
+    // TODO termostato? è su python2...
+    
+    
+  ]
+}
+
