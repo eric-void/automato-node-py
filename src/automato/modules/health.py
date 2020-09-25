@@ -30,8 +30,8 @@ definition = {
 
     # After this time in "alive" state, if no "health event" occours the status goes to "idle"
     'health-idle-time': '6h', 
-    # Every "run_interval" or "check_interval" timeout check will consider original property multiplied by this factor (e.g. if "run_interval" il 10, the checker will consider timeout if not published in 15 seconds)
-    'health-check_interval-multiplier': 1.5,
+    # Every "run_interval" or "check_interval" timeout check will consider original property multiplied by this factor (e.g. if "run_interval" is 10, the checker will consider timeout if not published in 15 seconds)
+    'health-check_interval-multiplier': 2,
     # Internal
     'health-checker-secs': 5,
   },
