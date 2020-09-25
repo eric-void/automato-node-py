@@ -126,9 +126,12 @@ definition = {
   
   # [L.0]
   'publish': {
+    # Elenco di topic_rule da matchare. Ogni messaggio in ingresso verrà associato a un solo topic_rule. Se ci sono più match, verrà scelto quello con più alto "topic_match_priority", o uno a caso in caso di equivalenza.
+    
     'topic' : { # In formato "topic_rule" (Vedi sotto)
       # [L.1]
       'topic': '...', # Il vero "topic_rule" di questo publish. Se specificato significa che la chiave 'topic' in realtà è un alias, il topic vero è specificato qui
+      'topic_match_priority': 1, # Se per un topic ci sono più topic_match in questo publish, sceglie quello con la priority più alta. Se non specificata = 1, a meno che la definition sia vuota ({}), nel caso è 0
       
       # [L.0]
       'description': _('...'),
@@ -182,14 +185,19 @@ definition = {
       "run_on": [ "entry_id.event(condition)", "..." ],
       
       ... # Metadati specifici del tipo di modulo
-    }
+    },
+      
+    'topic_base/#': {}, # In questo modo si fa un "catch_all" di tutti i topic che sono associato a questo entry, ma non hanno una loro definizione (solo per sapere il publisher). Non avendo definizione (o avendo solo "topic") il loro "topic_match_priority" è 0.
   },
   # [L.0]
   'subscribe': {
+    # Elenco di topic_rule da matchare. Ogni messaggio in ingresso verrà associato a un solo topic_rule. Se ci sono più match, verrà scelto quello con più alto "topic_match_priority", o uno a caso in caso di equivalenza.
+
     # IMPORTANTE: A meno che non siamo in un subscribe "interno" (cioè un subscribe che non deve figurare come subscribe di entry nella descrizione dell'entry) occorre definire "description" o "response"/"publish"
     'topic': { # In formato "topic_rule", vedi sotto
       # [L.1]
       'topic': '...', # topic_rule assegnato a questo subscribe. Se specificato significa che la chiave 'topic' in realtà è un alias, il topic vero è specificato qui
+      'topic_match_priority': 1, # Se per un topic ci sono più topic_match in questo subscribe, sceglie quello con la priority più alta. Se non specificata = 1, a meno che la definition sia vuota ({}), nel caso è 0
       
       # [L.0]
       'description': _('...'),
