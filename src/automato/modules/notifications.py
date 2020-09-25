@@ -19,6 +19,7 @@ definition = {
     "history_filter": "info",
     "notify_send": False,
     "notify_send_level": "info",
+    "history_compress": True,
   },
   
   "subscribe": {
@@ -117,7 +118,10 @@ def topic_matches(topic, level, pattern, entry):
 
 # Pubblica "notifications/history" quando richiesto da "notifications/history/get"
 def publish(entry, topic, definition):
-  entry.publish('', { "time": system.time(), "history": entry.data['history']})
+  if (entry.config['history_compress'])
+    entry.publish('', { "time": system.time(), "+history": utils.b64_compress_data(entry.data['history'])})
+  else
+    entry.publish('', { "time": system.time(), "history": entry.data['history']})
 
 def on_notifications_subscribe(entry, subscribed_message):
   if type(subscribed_message.payload) != str:
