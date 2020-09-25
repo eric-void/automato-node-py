@@ -439,8 +439,7 @@ def run_publish_lambda(entry):
 def run_publish(entry, topic_rule):
   defs = system.entries_publishers_of(entry.topic(topic_rule), strict_match = True)
   if defs and entry.id in defs:
-    for etopic in defs[entry.id]:
-      entry_invoke_publish(entry, etopic, entry.definition['publish'][etopic])
+    entry_invoke_publish(entry, defs[entry.id]['topic'], entry.definition['publish'][defs[entry.id]['topic']])
 
 def entry_invoke_publish(entry, topic_rule, topic_definition):
   if 'handler' in topic_definition:
