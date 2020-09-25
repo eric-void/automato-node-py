@@ -92,7 +92,7 @@ def on_metadata(entry, subscribed_message):
     if not entry.config['local']:
       for node in todo:
         #entry.data[node] = payload['nodes'][node]
-        payload_entries = _decompress_data(payload['entries'])
+        payload_entries = utils.b64_decompress_data(payload['entries'])
         node_entries = {}
         for entry_id in payload_entries:
           if entry_id.endswith('@' + node):
@@ -110,7 +110,7 @@ def publish_metadata(entry, topic, local_metadata = None):
     'from_node': system.default_node_name,
     'time': system.time(),
     'nodes': entry.data['nodes'],
-    'entries': _compress_data(system.entries_definition_exportable()) if entry.config['compress'] else system.entries_definition_exportable(),
+    'entries': utils.b64_compress_data(system.entries_definition_exportable()) if entry.config['compress'] else system.entries_definition_exportable(),
   })
 
 def publish_data(entry, topic, local_metadata = None):
@@ -125,7 +125,7 @@ def publish_data(entry, topic, local_metadata = None):
     entry.publish(topic, {
       'from_node': system.default_node_name,
       'time': system.time(),
-      '+': _compress_data({
+      '+': utils.b64_compress_data({
         'entries': system.entries_definition_exportable(),
         'events': system.events_export(),
       })
@@ -146,17 +146,3 @@ def run(entry):
     # Can't kill myself
     #if [node for node in entry.data['seen'] if node == system.default_node_name and t - entry.data['seen'][node]['his_time'] > utils.read_duration(entry.config['dead_time'])]:
     #  ###SEND_MESSAGE###('./metadata', _('Hi, i\'m automato node "{name}", and i don\'t receive my own metadata since {time}, problems on MQTT broker? Or am i dead?').format(name = system.default_node_name, time = utils.strftime(entry.data['seen'][system.default_node_name]['his_time'])), 'critical')
-      
-def _compress_data(data):
-  try:
-    return base64.b64encode(zlib.compress(json.dumps(data).encode('UTF-8'))).decode('UTF-8')
-  except:
-    logging.exception("Nodes module: Error compressing: " + str(data))
-    return ""
-
-def _decompress_data(string):
-  try:
-    return json.loads(zlib.decompress(base64.b64decode(string.encode('UTF-8'))).decode('UTF-8')) if isinstance(string, str) else string
-  except:
-    logging.exception("Nodes module: Error decompressing: " + str(string))
-    return {}
