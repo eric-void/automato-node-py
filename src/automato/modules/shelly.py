@@ -31,6 +31,8 @@ def entry_install(installer_entry, entry, conf):
   # @see http://shelly-api-docs.shelly.cloud/#mqtt-support http://shelly-api-docs.shelly.cloud/#shelly1-mqtt http://shelly-api-docs.shelly.cloud/#shelly2-mqtt
   system.entry_definition_add_default(entry, {
     'publish': {
+      'default': { 'topic': base_topic + '#' },
+      
       'output': {
         'topic': '/^' + base_topic + 'relay/([0-9]+)$/',
         'description': _('Current output status of the relay'),

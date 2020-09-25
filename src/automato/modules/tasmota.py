@@ -40,6 +40,9 @@ def entry_install(installer_entry, entry, conf):
   
   system.entry_definition_add_default(entry, {
     'publish': {
+      topic_stat + '/#': {},
+      topic_tele + '/#': {},
+
       'power': {
         'topic': '/^' + topic_stat + 'POWER([0-9]*)$/',
         'description': _("Tasmota device {caption} has changed power toggle state"),
