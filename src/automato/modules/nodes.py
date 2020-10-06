@@ -2,9 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import logging
-import zlib
-import base64
-import json
 
 from automato.core import system
 from automato.core import utils

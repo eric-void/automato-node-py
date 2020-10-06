@@ -118,9 +118,9 @@ def topic_matches(topic, level, pattern, entry):
 
 # Pubblica "notifications/history" quando richiesto da "notifications/history/get"
 def publish(entry, topic, definition):
-  if (entry.config['history_compress'])
+  if entry.config['history_compress']:
     entry.publish('', { "time": system.time(), "+history": utils.b64_compress_data(entry.data['history'])})
-  else
+  else:
     entry.publish('', { "time": system.time(), "history": entry.data['history']})
 
 def on_notifications_subscribe(entry, subscribed_message):

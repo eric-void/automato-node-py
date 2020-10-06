@@ -131,6 +131,7 @@ definition = {
     'topic' : { # In formato "topic_rule" (Vedi sotto)
       # [L.1]
       'topic': '...', # Il vero "topic_rule" di questo publish. Se specificato significa che la chiave 'topic' in realtà è un alias, il topic vero è specificato qui
+      # [L.0]
       'topic_match_priority': 1, # Se per un topic ci sono più topic_match in questo publish, sceglie quello con la priority più alta. Se non specificata = 1, a meno che la definition sia vuota ({}), nel caso è 0
       
       # [L.0]
@@ -197,6 +198,7 @@ definition = {
     'topic': { # In formato "topic_rule", vedi sotto
       # [L.1]
       'topic': '...', # topic_rule assegnato a questo subscribe. Se specificato significa che la chiave 'topic' in realtà è un alias, il topic vero è specificato qui
+      # [L.0]
       'topic_match_priority': 1, # Se per un topic ci sono più topic_match in questo subscribe, sceglie quello con la priority più alta. Se non specificata = 1, a meno che la definition sia vuota ({}), nel caso è 0
       
       # [L.0]
