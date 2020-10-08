@@ -184,8 +184,10 @@ def _on_system_message(message):
           # TODO 2020CHANGE non dovrebbe servire più current_*
           #record[1].request.current_action = 'subscribe'
           #record[1].request.current_message = message
+          _s = _stats_start()
           record[0](record[1], sm.copy())
           record[1].store_data()
+          _stats_end('subscribe_handler(' + sm.topic_rule + '@' + sm.entry.id + ')', _s)
 
 def run():
   entries_invoke_threaded('start')
