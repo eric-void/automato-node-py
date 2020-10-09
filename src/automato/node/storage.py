@@ -5,6 +5,8 @@ import logging
 import os
 import json
 
+from automato.core import system
+
 path = './data'
 
 def init(_path):
@@ -52,6 +54,7 @@ def storeData(entry, blocking = True):
   if not entry.data_lock.acquire(blocking):
     return False
   try:
+    _s = system._stats_start()
     data = json.dumps(entry.data)
     if entry.store_data_saved != data:
       if os.path.isfile(path + '/' + entry.node_name + '_data_' + entry.id_local + '.json.new'):
@@ -73,6 +76,7 @@ def storeData(entry, blocking = True):
     return False
   finally:
     entry.data_lock.release()
+    system._stats_end('storage.store_data', _s)
 
 '''
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
