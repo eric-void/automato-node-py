@@ -256,6 +256,7 @@ def run_step():
       _s1 = system._stats_start()
       entry.store_data(False)
       system._stats_end('node.run.store_data', _s1)
+  entry.storeDelayedEntries()
   system._stats_end('node.run', _s)
 
 def _on_mqtt_subscribed_message_publish_lambda(_entry, _topic):
