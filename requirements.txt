@@ -12,3 +12,6 @@ croniter >= 0.3.26
 
 # https://github.com/PiotrDabkowski/Js2Py
 # Js2Py >= 0.60
+
+# https://github.com/msgpack/msgpack-python
+msgpack >= 1.0.0

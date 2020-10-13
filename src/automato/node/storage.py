@@ -8,19 +8,17 @@ import json
 from automato.core import system
 
 path = './data'
-store_delay_ms = 1000
-store_delayed_entries = {}
 
 def init(_path):
   global path
   path = os.path.realpath(os.path.join(os.getcwd(), _path))
   
 def destroy():
-  storeDelayedEntries()
+  pass
   
 def entry_install(self, entry):
   entry.storage = self
-  entry.store_data = lambda blocking = True, force = False: storeData(entry, blocking, force)
+  entry.store_data = lambda blocking = True: storeData(entry, blocking)
   entry.store_data_saved = None
   entry.store_timems = 0
 
@@ -51,21 +49,20 @@ def retrieveData(entry):
   finally:
     entry.data_lock.release()
 
-def storeData(entry, blocking = True, force = False):
-  global store_delayed_entries
-  
+def storeData(entry, blocking = True):
   if not entry.data:
     return False
   if not entry.data_lock.acquire(blocking):
     return False
   try:
     _s = system._stats_start()
-    data = json.dumps(entry.data)
-    if entry.store_data_saved != data:
-      if not force and (system.timems() - entry.store_timems < store_delay_ms):
-        store_delayed_entries[entry.id] = entry
-        return False
+    _s2 = False
+
+    cmpdata = repr(entry.data)
+    if entry.store_data_saved != cmpdata:
+      data = json.dumps(entry.data)
       
+      _s2 = system._stats_start()
       if os.path.isfile(path + '/' + entry.node_name + '_data_' + entry.id_local + '.json.new'):
         os.remove(path + '/' + entry.node_name + '_data_' + entry.id_local + '.json.new')
       with fileOpen(entry.node_name + '_data_' + entry.id_local + '.json.new', 'w') as f:
@@ -77,11 +74,8 @@ def storeData(entry, blocking = True, force = False):
         if os.path.isfile(path + '/' + entry.node_name + '_data_' + entry.id_local + '.json'):
           os.remove(path + '/' + entry.node_name + '_data_' + entry.id_local + '.json')
         os.rename(path + '/' + entry.node_name + '_data_' + entry.id_local + '.json.new', path + '/' + entry.node_name + '_data_' + entry.id_local + '.json')
-      entry.store_data_saved = data
-      entry.store_timems = system.timems()
-      if entry.id in store_delayed_entries:
-        del store_delayed_entries[entry.id]
       
+      entry.store_data_saved = cmpdata
     return True
   except:
     logging.exception("#{id}> failed storing data".format(id = entry.id))
@@ -89,11 +83,8 @@ def storeData(entry, blocking = True, force = False):
   finally:
     entry.data_lock.release()
     system._stats_end('storage.store_data', _s)
-
-def storeDelayedEntries(force = False):
-  global store_delayed_entries
-  while len(store_delayed_entries):
-    next(iter(store_delayed_entries.values())).store_data(force = force)
+    if _s2:
+      system._stats_end('storage.store_data', _s)
 
 '''
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))

@@ -54,6 +54,13 @@ def destroy():
       threads[t].join()
 
   entries_invoke('destroy')
+  
+  clone_entry_names = list(system.entries().keys()) # I make a clone of entry names, because some handler could change "entries"
+  for entry_id in clone_entry_names:
+    entry = system.entry_get(entry_id)
+    if entry and entry.is_local:
+      entry.store_data()
+  
   storage.destroy()
   system.destroy()
   _system_initialized = False
@@ -186,7 +193,8 @@ def _on_system_message(message):
           #record[1].request.current_message = message
           _s = system._stats_start()
           record[0](record[1], sm.copy())
-          record[1].store_data()
+          #20201012 Disabled, too time consuming (and no store_data() is present for a lot of other conditions like event listeners and so on). store_data is done every seconds by run()>run_step()
+          #record[1].store_data()
           system._stats_end('subscribe_handler(' + sm.topic_rule + '@' + sm.entry.id + ')', _s)
 
 def run():
@@ -256,7 +264,6 @@ def run_step():
       _s1 = system._stats_start()
       entry.store_data(False)
       system._stats_end('node.run.store_data', _s1)
-  storage.storeDelayedEntries()
   system._stats_end('node.run', _s)
 
 def _on_mqtt_subscribed_message_publish_lambda(_entry, _topic):
