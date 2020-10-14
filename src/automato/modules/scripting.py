@@ -35,6 +35,11 @@ def scripting_globals(entry, _globals):
     
     # METHODS
     'd': utils.read_duration, # (duration)
+    'array_sum': utils.array_sum,
+    'array_avg': utils.array_avg,
+    'array_min': utils.array_min,
+    'array_max': utils.array_max,
+    
     'publish': entry.publish, # (topic, payload = None, qos = None, retain = None, response_callback = None, no_response_callback = None, response_id = None)
     'entry_invoke': node.entry_invoke, # (entry, method, *args, **kwargs)
     #'entries_invoke': node.entries_invoke, # (method, *args, **kwargs)
