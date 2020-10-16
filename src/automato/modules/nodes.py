@@ -111,12 +111,17 @@ def publish_metadata(entry, topic, local_metadata = None):
   })
 
 def publish_data(entry, topic, local_metadata = None):
+  last_seen = {}
+  for e in system.entries().values():
+    last_seen[e.id] = e.last_seen
+  
   if not entry.config['compress']:
     entry.publish(topic, {
       'from_node': system.default_node_name,
       'time': system.time(),
       'entries': system.entries_definition_exportable(),
       'events': system.events_export(),
+      'last_seen': last_seen,
     });
   else:
     entry.publish(topic, {
@@ -125,6 +130,7 @@ def publish_data(entry, topic, local_metadata = None):
       '+': utils.b64_compress_data({
         'entries': system.entries_definition_exportable(),
         'events': system.events_export(),
+        'last_seen': last_seen,
       })
     });
 

@@ -135,9 +135,10 @@ def test_run(entries):
       "events": {
         "nodes@TEST": {}, 
         "scripting@TEST": {}, 
-        "light1@TEST": {"output": [{"time": ('d', t1), "params": {"value": "2"}, "changed_params": {"value": "2"}, "keys": {}}]}, 
-        "otherbutton1@OTHERNODE": {"input": [{"time": ('d', t1), "params": {"value": "1"}, "changed_params": {"value": "1"}, "keys": {}}]}, 
+        "light1@TEST": {"output": [{"name": "output", "time": ('d', t1), "params": {"value": "2"}, "changed_params": {"value": "2"}, "keys": {}}]}, 
+        "otherbutton1@OTHERNODE": {"input": [{"name": "input", "time": ('d', t1), "params": {"value": "1"}, "changed_params": {"value": "1"}, "keys": {}}]}, 
         "otherlight2@OTHERNODE": {"output": []}
-      }
+      },
+      "last_seen": ()
     }}
   )
