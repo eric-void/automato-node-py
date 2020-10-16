@@ -14,8 +14,12 @@ entry.caption = '...'
 # Tipologia di entry. In caso di entry.type == 'module' viene instanziato anche entry.module, con l'istanza del modulo (l'import della classe)
 entry.type = 'module|device|item'
 
-# created (int): timestamp
+# created (int/timestamp)
 entry.created
+
+# last_seen(int/timestamp): data dell'ultimo messaggio del quale l'entry è risultato publisher (in caso di publisher multipli, per ognuno è impostato il last_seen).
+entry.last_seen
+
 
 # node (dict): l'intera configurazione del nodo (quella definita nel config caricato via riga di comando)
 entry.node = {}
@@ -180,6 +184,10 @@ definition = {
         "state": "js:({value: payload['value'] == 'on' ? 1 : 0, value2: 0 + payload['value2']})",
         "clock": "js:({value: payload['time']})",
         'location': "js:(payload['_type'] == 'location' ? {latitude: payload['lat'], longitude: payload['lon'], altitude: payload['alt'], radius: payload['acc'], radius_unit: 'm', regions: 'inregions' in payload ? payload['inregions'] : [], source: 'owntracks'} : null)",
+        "eventname": ["js:...", "js:..."], # Se è possibile invocare più eventi con lo stesso nome è possibile specificare un array di definizioni
+        "eventname:keys": [ "port", "channel"], # Le chiavi da usare per discriminare gli eventi (e la sua cache), da usare al posto di "event_params_keys" di entry (o globale). WARN: Se vengono dichiarati più ":keys" per lo stesso eventname, ne verrà considerato solo uno (di solito l'ultimo)
+        "eventname:init": { "unit": "W" }, # Inizializzazione per gli stati, fatta a caricamento dell'entry. WARN: Se vengono dichiarati più ":init" per lo stesso eventname, ne verrà considerato solo uno (di solito l'ultimo)
+        "eventname:init": [{ "port": "0", "unit": "W" }, { "port": "1", "unit": "J"}], # Inizializzazione per gli stati, con "event_params_keys" diversi
       },
       
       # [L.2] Esegue questo publish quando viene emesso l'evento specificato
@@ -354,7 +362,7 @@ def destroy(entry):
 def on_subscribed_message(entry, subscribed_message):
   first_published_message = subscribed_message.message.firstPublishedMessage() # Primo messaggio pubblicato (potrebbe essercene anche piu' di uno se dello stesso messaggio ci sono più "publish", nel caso si possono vedere subscribed_message.message.publishedMessages())
   source_entry = firstpm.entry if firstpm else None # Entry che ha pubblicato il messaggio (o meglio, risconosciuto come primo pubblicatore del messaggio, potrebbe essercene più di uno)
-  listened_events = subscribed_message.message.events() # { 'eventname': { 'params': ..., 'changed_params': ... }, ... } Tutti gli eventi legati a questo messaggio (da tutti i pubblicatori)
+  listened_events = subscribed_message.message.events() # [{ 'eventname': ..., 'params': ..., 'changed_params': ..., 'key': ..., 'time': ...}, ...] Tutti gli eventi legati a questo messaggio (da tutti i pubblicatori)
   is_retained = subscribed_message.message.retain # Il messaggio è stato ricevuto in quanto retained e il client si è appena connesso al broker
   
   print(matches[1])
