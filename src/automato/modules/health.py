@@ -239,8 +239,8 @@ def on_subscribe_all_messages(entry, subscribed_message):
     return
 
   firstpm = subscribed_message.message.firstPublishedMessage()
-  listened_events = subscribed_message.message.events()
-  if firstpm and firstpm.entry.is_local and 'connected' not in listened_events and 'alive' not in listened_events and 'failure' not in listened_events:
+  listened_events = [e for e in subscribed_message.message.events() if e['name'] == 'connected' or e['name'] == 'alive' or e['name'] == 'failure']
+  if firstpm and firstpm.entry.is_local and len(listened_events) == 0:
     if firstpm.entry.health_config_alive_on_message:
       event_connected(entry, firstpm.entry, 'connected', { 'params': { 'value': True } }, from_generic_message = True)
     if firstpm.entry.health_config_dead_message_timeout:
