@@ -245,6 +245,8 @@ definition = {
           'topic': 'js:"' + base_topic + 'relay/" + ("port" in params ? params["port"] : "0") + "/command"', 
           'payload': 'js:params["value"] ? "on" : "off"'
         },
+        # initialize an event 'action/output-set' with this params (and time = -1)
+        'output-set:init': { 'value:unit': 'W', 'value:def': [0, 1] }
       }
       # FOCUS: Come funziona la gestione "params" e "init" nelle actions (vedi anche system_test dove ci sono test appositiv)
       # Abbiamo una action definita come 'payload': 'js:({"v": params["v"]})', 'init': 'js:...'
