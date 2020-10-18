@@ -25,16 +25,17 @@ def test_init():
   })
 
 def test_run(entries):
-  test.assertPublish('get_on', 'shellies/shellyswitch-XXXXXX/relay/1', 'on', assertEvents = {'output': {'value': 1, 'port': '1'}})
-  test.assertPublish('get_off', 'shellies/shellyswitch-XXXXXX/relay/1', 'off', assertEvents = {'output': {'value': 0, 'port': '1'}})
+  test.assertPublish('get_on', 'shellies/shellyswitch-XXXXXX/relay/1', 'on', assertEvents = {'output': {'value': 1, 'port': '1', 'port:def': ['0', '1'], 'value:def': [0, 1]}})
+  test.assertPublish('get_off', 'shellies/shellyswitch-XXXXXX/relay/1', 'off', assertEvents = {'output': {'value': 0, 'port': '1', 'port:def': ['0', '1'], 'value:def': [0, 1]}})
   test.assertAction('set_on', 'shelly-test', 'output-set', {'value': 1}, assertSubscribe = {'shellies/shellyswitch-XXXXXX/relay/0/command': 'on'})
   test.assertAction('set_off', 'shelly-test', 'output-set', {'value': 0, 'port': '1'}, assertSubscribe = {'shellies/shellyswitch-XXXXXX/relay/1/command': 'off'})
-  test.assertPublish('get_input_on', 'shellies/shellyswitch-XXXXXX/input/0', '1', assertEvents = {'input': {'value': 1, 'port': '0', 'channel': 'singlepush'}})
-  test.assertPublish('get_power', 'shellies/shellyswitch-XXXXXX/relay/1/power', '3.5', assertEvents = {'energy': {'power': 3.5, 'power_unit': 'W', 'port': '1'}})
+  test.assertPublish('get_input_on', 'shellies/shellyswitch-XXXXXX/input/0', '1', assertEvents = {'input': {'value': 1, 'port': '0', 'channel': 'singlepush', 'port:def': ['0', '1'], 'value:def': [0, 1], 'channel:def': ['singlepush', 'longpush']}})
+  test.assertPublish('get_power', 'shellies/shellyswitch-XXXXXX/relay/1/power', '3.5', assertEvents = {'energy': {'power': 3.5, 'port': '1', 'port:def': ['0', '1'], 'power:def': 'float', 'power:unit': 'W', 'energy:def': 'float', 'energy:unit': 'kWh', 'energy_reported:def': 'float', 'energy_reported:unit': 'Wmin'}})
+  test.assertPublish('get_power2', 'shellies/shellyswitch-XXXXXX/relay/1/energy', '6000', assertEvents = {'energy': {'power': 3.5, 'energy': 0.1, 'energy_reported': 6000, 'port': '1', 'port:def': ['0', '1'], 'power:def': 'float', 'power:unit': 'W', 'energy:def': 'float', 'energy:unit': 'kWh', 'energy_reported:def': 'float', 'energy_reported:unit': 'Wmin'}})
   test.assertPublish('lwt_online', 'shellies/shellyswitch-XXXXXX/online', 'true', assertEvents = {'connected': { 'value': True }})
   test.assertPublish('lwt_offline', 'shellies/shellyswitch-XXXXXX/online', 'false', assertEvents = {'connected': { 'value': False }})
   test.assertPublish('input', 'shellies/shellyswitch-XXXXXX/input/0', '1', 
-    assertEvents = {'input': {'value': 1, 'port': '0', 'channel': 'singlepush'}},
+    assertEvents = {'input': {'value': 1, 'port': '0', 'channel': 'singlepush', 'port:def': ['0', '1'], 'value:def': [0, 1], 'channel:def': ['singlepush', 'longpush']}},
     assertNotification = [ "debug", "Shelly device 'shelly-test' input #0 state is: ON" ],
   )
   

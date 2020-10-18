@@ -17,9 +17,21 @@
 
 from automato.core import system
 
+default_def = { 'output_port:def': ['0'], 'input_port:def': ['0'], 'relay:def': [0, 1], 'input:def': [0, 1] }
+device_types = {
+  'tasmota': { },
+  'tasmota_dual': { 'output_port:def': ['0', '1'], 'input_port:def': ['0', '1'] },
+  'tasmota_sonoff': { },
+  'tasmota_sonoff_basic': { },
+  'tasmota_sonoff_dual': { 'output_port:def': ['0', '1', '2'], 'input_port:def': ['0', '1', '2', '3'] },
+  'tasmota_sonoff_dualr2': { 'output_port:def': ['0', '1', '2'], 'input_port:def': ['0', '1', '2', '3'] },
+  'tasmota_sonoff_pow': { },
+  'tasmota_sonoff_powr2': { },
+}
+
 definition = {
   "install_on": {
-    "device_type": 'tasmota',
+    "device_type": ('in', list(device_types.keys())),
     "/^tasmota_(.*)$/": (),
   },
   
@@ -34,6 +46,8 @@ definition = {
 }
 
 def entry_install(installer_entry, entry, conf):
+  device_type = conf['device_type'] if 'device_type' in conf else 'tasmota'
+  t = {x: y for x, y in { **default_def, **device_types[device_type] }.items() if y is not None}
   topic_cmd = installer_entry.config['tasmota-fulltopic'].replace('%prefix%', installer_entry.config['tasmota-prefix1']).replace('%topic%', conf['id'])
   topic_stat = installer_entry.config['tasmota-fulltopic'].replace('%prefix%', installer_entry.config['tasmota-prefix2']).replace('%topic%', conf['id'])
   topic_tele = installer_entry.config['tasmota-fulltopic'].replace('%prefix%', installer_entry.config['tasmota-prefix3']).replace('%topic%', conf['id'])
@@ -51,6 +65,7 @@ def entry_install(installer_entry, entry, conf):
         'notify_level': 'debug',
         'events': {
           'output': 'js:({value: payload == "ON" ? 1 : 0, port: matches[1] ? matches[1] : "0"})',
+          'output:init': {'port:def': t['output_port:def'], 'value:def': t['relay:def']},
         }
       },
       'result': {
@@ -89,10 +104,11 @@ def entry_install(installer_entry, entry, conf):
         'payload_transform': 'js:if ("StatusSNS" in payload) payload = payload["StatusSNS"]; payload["Data"] = {}; for (k in payload) { if (payload[k] && typeof payload[k] == "object" && !(payload[k] instanceof Array)) { for (x in payload[k]) payload["Data"][x] = payload[k][x]; payload["SensorType"] = k } }; payload',
         #'_payload_transform': 'js:payload',
         'events': {
-          'temperature': 'js:"Temperature" in payload["Data"] && "TempUnit" in payload ? { "value": parseFloat(payload["Data"]["Temperature"]), "unit": payload["TempUnit"] } : null',
+          'temperature': 'js:"Temperature" in payload["Data"] && "TempUnit" in payload ? { "value": parseFloat(payload["Data"]["Temperature"]), "value:unit": "°" + payload["TempUnit"] } : null',
           'humidity': 'js:"Humidity" in payload["Data"] ? { "value": parseFloat(payload["Data"]["Humidity"]) } : null',
-          'pressure': 'js:"Pressure" in payload["Data"] && "PressureUnit" in payload ? { "value": parseFloat(payload["Data"]["Pressure"]), "unit": payload["PressureUnit"] } : null',
-          'energy': 'js:payload["SensorType"] == "ENERGY" ? {"power": payload["Power"], "power_reactive": payload["ReactivePower"], "power_apparent": payload["ApparentPower"], "power_factor": payload["Factor"], "power_unit": "W", "energy_today": payload["Today"], "energy_yesterday": payload["Yesterday"], "energy_total": payload["Total"], "total_starttime": t(payload["TotalStartTime"]), "total_duration": t(payload["Time"]) - t(payload["TotalStartTime"]), "energy_unit": "kWh", "voltage": payload["Voltage"], "voltage_unit": "V", "current": payload["Current"], "current_unit": "A"  } : null',
+          'pressure': 'js:"Pressure" in payload["Data"] && "PressureUnit" in payload ? { "value": parseFloat(payload["Data"]["Pressure"]), "value:unit": payload["PressureUnit"] } : null',
+          'energy': 'js:payload["SensorType"] == "ENERGY" ? {"power": payload["Power"], "power_reactive": payload["ReactivePower"], "power_apparent": payload["ApparentPower"], "power_factor": payload["Factor"], "energy_today": payload["Today"], "energy_yesterday": payload["Yesterday"], "energy_total": payload["Total"], "total_starttime": t(payload["TotalStartTime"]), "total_duration": t(payload["Time"]) - t(payload["TotalStartTime"]), "voltage": payload["Voltage"], "current": payload["Current"] } : null',
+          'energy:init': { "power:unit": "W", "energy_unit": "kWh", "current_unit": "A", "voltage_unit": "V" },
           'clock': 'js:({value: t(payload["Time"])})',
         },
       },
@@ -116,7 +132,8 @@ def entry_install(installer_entry, entry, conf):
         'notify': _("Tasmota device '{caption}' button status detected: {payload[ACTION]}"),
         'notify_level': 'info',
         'events': {
-          'input': 'js:({value: 1, port: matches[1] ? matches[1] : "0", temporary: true, channel: payload["ACTION"]})' # channel = SINGLE|DOUBLE|TRIPLE|QUAD|PENTA|HOLD
+          'input': 'js:({value: 1, port: matches[1] ? matches[1] : "0", temporary: true, channel: payload["ACTION"]})', # channel = SINGLE|DOUBLE|TRIPLE|QUAD|PENTA|HOLD
+          'input:init': {'port:def': t['input_port:def'], 'value:def': t['input:def'], 'channel:def': ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'PENTA', 'HOLD']},
         }
       },
       # Not supported by standard tasmota install, but available with this rule:
@@ -155,6 +172,7 @@ def entry_install(installer_entry, entry, conf):
         # < stat/sonoff8/POWER2	ON
         'actions': {
           'output-set': { 'topic': 'js:"' + topic_cmd + 'POWER" + ("port" in params && params["port"] != "0" ? params["port"] : "")', 'payload': 'js:params["value"] ? "ON" : "OFF"' },
+          'output-set:init': { 'port:def': t['output_port:def'], 'value:def': t['relay:def'] },
         }
       },
       'output-get': {
@@ -162,6 +180,7 @@ def entry_install(installer_entry, entry, conf):
         'type': '',
         'actions': {
           'output-get': { 'topic': 'js:"' + topic_cmd + 'POWER" + ("port" in params && params["port"] != "0" ? params["port"] : "")', 'payload': 'js:""' },
+          'output-get:init': { 'port:def': t['output_port:def'] },
         }
       }
     }

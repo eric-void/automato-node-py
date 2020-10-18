@@ -25,8 +25,17 @@ received message zigbee2mqtt/xiaomi_aqara_water_1 = b'{"battery":100,"voltage":3
 
 from automato.core import system
 
+default_def = { 'output_port:def': ['0'], 'input_port:def': ['0'], 'relay:def': [0, 1], 'input:def': [0, 1] }
+device_types = {
+  'zigbee': { },
+  'zigbee_temperature': { },
+  'zigbee_button': { },
+  'zigbee_plug': { },
+}
+
 definition = {
   "install_on": {
+    "device_type": ('in', list(device_types.keys())),
     "zigbee_id": (),
   },
   'config': {
@@ -48,7 +57,9 @@ def entry_install(installer_entry, entry, conf):
           # channel: single | double | triple | quadruple | many | long | long_release [+ x_duration in ms]
           'input': 'js:((typeof payload == "object") && "click" in payload ? { value: 1, temporary: true, channel: payload["click"], "x_duration": "duration" in payload ? payload["duration"] : -1} : ' +
             '((typeof payload == "object") && "water_leak" in payload ? { value: payload["water_leak"] ? 1 : 0, channel: "water-leak" } : null))',
+          'input:init': { 'value:def': [0, 1], 'channel:def': ['single', 'double', 'triple', 'quadruple', 'many', 'long', 'water-leak' ], 'duration:def': 'int' },
           'temperature': 'js:((typeof payload == "object") && "temperature" in payload ? { value: payload["temperature"] } : null)',
+          'temperature:init': { 'value:unit': '°C' },
           'humidity': 'js:((typeof payload == "object") && "humidity" in payload ? { value: payload["humidity"] } : null)',
           'battery': 'js:((typeof payload == "object") && "battery" in payload ? { value: payload["battery"] } : null)',
           'output': 'js:((typeof payload == "object") && "state" in payload && (payload["state"] == "ON" || payload["state"] == "OFF") ? { value: payload["state"] == "ON" ? 1 : 0 } : null)',
@@ -62,8 +73,9 @@ def entry_install(installer_entry, entry, conf):
         'topic': 'zigbee2mqtt/' + str(conf["zigbee_id"]) + '/set',
         'response': [ 'zigbee2mqtt/' + str(conf["zigbee_id"]) ],
         'actions': {
-          "output-set": "js:params['value'] ? 'ON' : 'OFF'"
+          'output-set': "js:params['value'] ? 'ON' : 'OFF'",
+          'output-set:init': { 'value:def': [0, 1] },
         }
       }
-	}
+    }
   })
