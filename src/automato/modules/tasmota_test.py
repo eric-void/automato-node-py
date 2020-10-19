@@ -5,6 +5,7 @@ from automato.core import test
 
 def test_init():
   test.add_node_config({
+    "listen_all_events": True,
     "entries": [
       { "module": "toggle" },
       { "module": "tasmota" },
@@ -30,3 +31,5 @@ def test_run(entries):
   test.assertPublish('lwt_offline', 'tele/XXXXXX/LWT', 'Offline', assertEvents = {'connected': { 'value': False }})
   test.assertPublish('sensor', 'stat/XXXXXX/STATUS8', '{"StatusSNS":{"Time":"2018-12-03T13:48:08","SI7021":{"Temperature":17.7,"Humidity":51.2},"TempUnit":"C"}}', assertEvents = {'temperature': {'value': 17.7, 'value:unit': '°C'}, 'humidity': {'value': 51.2}, 'clock': {'value': 1543841288}}, assertNotification = ['debug', "Tasmota device 'SonoffTest' reports sensor SI7021 data: {'Humidity': 51.2, 'Temperature': 17.7}"])
   test.assertPublish('button', 'stat/XXXXXX/BUTTON3', '{"ACTION":"SINGLE"}', assertEvents = {'input': {'value': 1, 'port': '3', 'temporary': True, 'channel': "SINGLE", 'port:def': ['0'], 'value:def': [0, 1], 'channel:def': ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'PENTA', 'HOLD']}})
+  test.assertPublish('energy', 'stat/XXXXXX/STATUS8', '{"StatusSNS":{"Time":"2020-10-20T10:34:05","ENERGY":{"TotalStartTime":"2018-11-20T00:00:51","Total":[16.90943,0.00000,16.90943],"Yesterday":1.25883,"Today":0.36116,"Power":101,"ApparentPower":156,"ReactivePower":119,"Factor":0.65,"Voltage":236,"Current":0.662}}}', 
+    assertEvents = {'energy': {'current': 0.662, 'energy_today': 0.36116, 'energy_total': 16.90943, 'energy_yesterday': 1.25883, 'power': 101, 'power_apparent': 156, 'power_factor': 0.65, 'power_reactive': 119, 'total_duration': 60514394, 'total_starttime': 1542668451, 'voltage': 236, 'power:unit': 'W', 'energy:unit': 'kWh', 'current:unit': 'A', 'voltage:unit': 'V'}, 'clock': {'value': 1603182845}})
