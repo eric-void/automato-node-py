@@ -9,6 +9,8 @@ from automato.core import system
 
 path = './data'
 
+STORAGE_BACKUP_TIME = 5 * 60
+
 def init(_path):
   global path
   path = os.path.realpath(os.path.join(os.getcwd(), _path))
@@ -20,7 +22,7 @@ def entry_install(self, entry):
   entry.storage = self
   entry.store_data = lambda blocking = True: storeData(entry, blocking)
   entry.store_data_saved = None
-  entry.store_timems = 0
+  entry.store_backup_time = 0
 
 def fileExists(file):
   return os.path.isfile(path + '/' + file)
@@ -37,18 +39,29 @@ def fileRename(file1, file2):
 def retrieveData(entry):
   entry.data_lock.acquire()
   try:
-    if os.path.isfile(path + '/' + entry.node_name + '_data_' + entry.id_local + '.json'):
-      with fileOpen(entry.node_name + '_data_' + entry.id_local + '.json', 'r') as f:
-        c = f.read()
-        if c:
-          try:
-            entry.data = json.loads(c)
-            logging.debug("#{id}> retrieved data: {data}".format(id = entry.id, data = entry.data if len(str(entry.data)) < 500 else str(entry.data)[:500] + '...'))
-          except:
-            logging.exception("#{id}> failed retrieving data".format(id = entry.id))
+    loaded = _retrieveDataFrom(entry, entry.node_name + '_data_' + entry.id_local + '.json')
+    if not loaded:
+      loaded = _retrieveDataFrom(entry, entry.node_name + '_data_' + entry.id_local + '.backup.json')
   finally:
     entry.data_lock.release()
 
+def _retrieveDataFrom(entry, filename):
+  if os.path.isfile(path + '/' + filename):
+    with fileOpen(filename, 'r') as f:
+      c = f.read()
+      if c:
+        try:
+          entry.data = json.loads(c)
+          logging.debug("#{id}> storage: retrieved data from {filename}: {data}".format(id = entry.id, filename = filename, data = entry.data if len(str(entry.data)) < 500 else str(entry.data)[:500] + '...'))
+          return True
+        except:
+          logging.exception("#{id}> storage: failed retrieving data from {filename}".format(id = entry.id, filename = filename))
+      else:
+        logging.error("#{id}> storage: retrieved empty data from {filename}".format(id = entry.id, filename = filename))
+  else:
+    logging.info("#{id}> storage: data file not found: {filename}".format(id = entry.id, filename = filename))
+  return False
+  
 def storeData(entry, blocking = True):
   if not entry.data:
     return False
@@ -56,26 +69,19 @@ def storeData(entry, blocking = True):
     return False
   try:
     _s = system._stats_start()
-    _s2 = False
 
     cmpdata = repr(entry.data)
+    data = None
     if entry.store_data_saved != cmpdata:
       data = json.dumps(entry.data)
-      
-      _s2 = system._stats_start()
-      if os.path.isfile(path + '/' + entry.node_name + '_data_' + entry.id_local + '.json.new'):
-        os.remove(path + '/' + entry.node_name + '_data_' + entry.id_local + '.json.new')
-      with fileOpen(entry.node_name + '_data_' + entry.id_local + '.json.new', 'w') as f:
-        try:
-          f.write(data)
-        except:
-          logging.exception("Failed storing data for module {id}: {data}".format(id = entry.id, data = entry.data))
-      if os.path.isfile(path + '/' + entry.node_name + '_data_' + entry.id_local + '.json.new'):
-        if os.path.isfile(path + '/' + entry.node_name + '_data_' + entry.id_local + '.json'):
-          os.remove(path + '/' + entry.node_name + '_data_' + entry.id_local + '.json')
-        os.rename(path + '/' + entry.node_name + '_data_' + entry.id_local + '.json.new', path + '/' + entry.node_name + '_data_' + entry.id_local + '.json')
-      
+      _storeDataTo(entry, entry.node_name + '_data_' + entry.id_local + '.json')
       entry.store_data_saved = cmpdata
+    if system.time() - entry.store_backup_time > STORAGE_BACKUP_TIME:
+      if not data:
+        data = json.dumps(entry.data)
+      _storeDataTo(entry, entry.node_name + '_data_' + entry.id_local + '.backup.json')
+      entry.store_backup_time = system.time()
+
     return True
   except:
     logging.exception("#{id}> failed storing data".format(id = entry.id))
@@ -83,9 +89,20 @@ def storeData(entry, blocking = True):
   finally:
     entry.data_lock.release()
     system._stats_end('storage.store_data', _s)
-    if _s2:
-      system._stats_end('storage.store_data', _s)
 
+def _storeDataTo(entry, filename):
+  if os.path.isfile(path + '/' + filename + '.new'):
+    os.remove(path + '/' + filename + '.new')
+  with fileOpen(filename + '.new', 'w') as f:
+    try:
+      f.write(data)
+    except:
+      logging.exception("Failed storing data for module {id}: {data}".format(id = entry.id, data = entry.data))
+  if os.path.isfile(path + '/' + filename + '.new'):
+    if os.path.isfile(path + '/' + filename):
+      os.remove(path + '/' + filename)
+    os.rename(path + '/' + filename + '.new', path + '/' + filename)
+  
 '''
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 notifications_file = os.path.join(__location__, notifications_file)
