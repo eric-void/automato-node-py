@@ -20,7 +20,7 @@ def test_init():
   })
 
 def test_run(entries):
-  test.assertPublish('clock', 'tele/XXXXXX/STATE', '{"Time":"2019-05-10T10:17:01", "Uptime":220, "Vcc":3.260, "POWER":"OFF", "Wifi":{"AP":1, "SSID":"TANELORN", "RSSI":80, "APMac":"30:B5:C2:4F:D1:16"}}', assertSomeEvents = {'clock': {'value': 1557476221}})
+  test.assertPublish('clock', 'tele/XXXXXX/STATE', '{"Time":"2019-05-10T10:17:01", "Uptime":220, "Vcc":3.260, "POWER":"OFF", "Wifi":{"AP":1, "SSID":"TANELORN", "RSSI":80, "APMac":"30:B5:C2:4F:D1:16"}}', assertSomeEvents = {'clock': {'value': 1557476221}, 'output': {'value': 0, 'port': '0', 'port:def': ['0'], 'value:def': [0, 1]}})
   test.assertPublish('get_on', 'stat/XXXXXX/POWER', 'ON', assertEvents = {'output': {'value': 1, 'port': '0', 'port:def': ['0'], 'value:def': [0, 1]}})
   test.assertPublish('get_off', 'stat/XXXXXX/POWER2', 'OFF', assertEvents = {'output': {'value': 0, 'port': '2', 'port:def': ['0'], 'value:def': [0, 1]}})
   test.assertAction('set_on', 'sonoff-test', 'output-set', {'value': 1}, assertSubscribe = {'cmnd/XXXXXX/POWER': 'ON'})

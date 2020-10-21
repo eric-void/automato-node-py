@@ -87,6 +87,13 @@ def entry_install(installer_entry, entry, conf):
         'events': {
           'clock': 'js:({value: t(payload["Time"])})',
           'stats': 'js:(payload)', # TODO Decodificare
+          'output': [
+            'js: "POWER" in payload ? { value: payload["POWER"] == "ON" ? 1 : 0, port: "0" } : null',
+            'js: "POWER1" in payload ? { value: payload["POWER1"] == "ON" ? 1 : 0, port: "1" } : null',
+            'js: "POWER2" in payload ? { value: payload["POWER2"] == "ON" ? 1 : 0, port: "2" } : null',
+            'js: "POWER3" in payload ? { value: payload["POWER3"] == "ON" ? 1 : 0, port: "3" } : null',
+            'js: "POWER4" in payload ? { value: payload["POWER4"] == "ON" ? 1 : 0, port: "4" } : null',
+          ],
         },
         'check_interval': '5m',
       },
