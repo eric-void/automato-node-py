@@ -74,12 +74,12 @@ def storeData(entry, blocking = True):
     data = None
     if entry.store_data_saved != cmpdata:
       data = json.dumps(entry.data)
-      _storeDataTo(entry, entry.node_name + '_data_' + entry.id_local + '.json')
+      _storeDataTo(entry, entry.node_name + '_data_' + entry.id_local + '.json', data)
       entry.store_data_saved = cmpdata
     if system.time() - entry.store_backup_time > STORAGE_BACKUP_TIME:
       if not data:
         data = json.dumps(entry.data)
-      _storeDataTo(entry, entry.node_name + '_data_' + entry.id_local + '.backup.json')
+      _storeDataTo(entry, entry.node_name + '_data_' + entry.id_local + '.backup.json', data)
       entry.store_backup_time = system.time()
 
     return True
@@ -90,7 +90,7 @@ def storeData(entry, blocking = True):
     entry.data_lock.release()
     system._stats_end('storage.store_data', _s)
 
-def _storeDataTo(entry, filename):
+def _storeDataTo(entry, filename, data):
   if os.path.isfile(path + '/' + filename + '.new'):
     os.remove(path + '/' + filename + '.new')
   with fileOpen(filename + '.new', 'w') as f:
