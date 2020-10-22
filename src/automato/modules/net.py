@@ -73,7 +73,7 @@ definition = {
       'handler': 'publish_bandwidth',
       'run_interval': '5m',
       'events': {
-        'bandwidth': 'js:({"type": "lan", "download": payload["download_bps"], "download_unit": "bps", "upload": payload["upload_bps"], "upload_unit": "bps", "error": payload["error"]})',
+        'bandwidth': 'js:({"type": "lan", "download": payload["download_bps"], "download:unit": "bps", "upload": payload["upload_bps"], "upload:unit": "bps", "error": payload["error"]})',
         'clock': 'js:({"value": t(payload["time"])})',
       }
     }

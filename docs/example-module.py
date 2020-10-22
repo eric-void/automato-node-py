@@ -107,7 +107,7 @@ definition = {
   'notify_type': 'core', # Usato per la notifica "notify/NOTIFY_TYPE/NOTIFY_LEVEL/TOPIC". Default: 'unknown'
   'notify_level': 'debug|info|warn|error|critical', # Usato per la notifica "notify/NOTIFY_TYPE/NOTIFY_LEVEL/TOPIC". Default: 'info'
   'notify_change_level': '...', 
-  'event_params_keys': ['...'], # I nomi dei parametri degli eventi che permettono di discriminare eventi diversi, con lo stesso nome. La cache degli eventi (per event_get) e il changed_params dipendono da questo. Il default è ['port', 'channel']. Ad esempio event_get('x.output(js:params['port'] == '1') deve dare un risultato diverso (e cachato a parte) di params['port'] == '2'.
+  'event_keys': ['...'], # I nomi dei parametri degli eventi che permettono di discriminare eventi diversi, con lo stesso nome. La cache degli eventi (per event_get) e il changed_params dipendono da questo. Il default è ['port', 'channel']. Ad esempio event_get('x.output(js:params['port'] == '1') deve dare un risultato diverso (e cachato a parte) di params['port'] == '2'.
 
   # [L.2]
   'run_interval': 30, # Se specificato, richiama il metodo "run(entry)" ogni X secondi
@@ -183,11 +183,11 @@ definition = {
       "events": { # Variabili a disposizione di definizione: {topic}, {payload}, {matches}
         "state": "js:({value: payload['value'] == 'on' ? 1 : 0, value2: 0 + payload['value2']})",
         "clock": "js:({value: payload['time']})",
-        'location': "js:(payload['_type'] == 'location' ? {latitude: payload['lat'], longitude: payload['lon'], altitude: payload['alt'], radius: payload['acc'], radius_unit: 'm', regions: 'inregions' in payload ? payload['inregions'] : [], source: 'owntracks'} : null)",
+        'location': "js:(payload['_type'] == 'location' ? {latitude: payload['lat'], longitude: payload['lon'], altitude: payload['alt'], radius: payload['acc'], radius:unit: 'm', regions: 'inregions' in payload ? payload['inregions'] : [], source: 'owntracks'} : null)",
         "eventname": ["js:...", "js:..."], # Se è possibile invocare più eventi con lo stesso nome è possibile specificare un array di definizioni
-        "eventname:keys": [ "port", "channel"], # Le chiavi da usare per discriminare gli eventi (e la sua cache), da usare al posto di "event_params_keys" di entry (o globale). WARN: Se vengono dichiarati più ":keys" per lo stesso eventname, ne verrà considerato solo uno (di solito l'ultimo)
+        "eventname:keys": [ "port", "channel"], # Le chiavi da usare per discriminare gli eventi (e la sua cache), da usare al posto di "event_keys" di entry (o globale). WARN: Se vengono dichiarati più ":keys" per lo stesso eventname, ne verrà considerato solo uno (di solito l'ultimo)
         "eventname:init": { "unit": "W" }, # Inizializzazione per gli stati, fatta a caricamento dell'entry. WARN: Se vengono dichiarati più ":init" per lo stesso eventname, ne verrà considerato solo uno (di solito l'ultimo)
-        "eventname:init": [{ "port": "0", "unit": "W" }, { "port": "1", "unit": "J"}], # Inizializzazione per gli stati, con "event_params_keys" diversi
+        "eventname:init": [{ "port": "0", "unit": "W" }, { "port": "1", "unit": "J"}], # Inizializzazione per gli stati, con "event_keys" diversi
       },
       
       # [L.2] Esegue questo publish quando viene emesso l'evento specificato
@@ -255,7 +255,7 @@ definition = {
       # @see system.entry_do_action() per il codice che gestisce
       # 
       # ATTENZIONE:
-      # La manipolazione dei parametri 'port', 'channel' o altri event_params_keys (vedi sopra) deve SEMPRE avvenire dentro gli 'init' code (ovviamente se il parametro non viene manipolato non ci sono problemi).
+      # La manipolazione dei parametri 'port', 'channel' o altri event_keys (vedi sopra) deve SEMPRE avvenire dentro gli 'init' code (ovviamente se il parametro non viene manipolato non ci sono problemi).
       # In caso contrario la gestione delle cache "event_get" non li rileva, e quindi potrebbe non essere ottimizzata (vedi event_get_invalidate_on_action)
       
       ... # Metadati specifici del tipo di modulo

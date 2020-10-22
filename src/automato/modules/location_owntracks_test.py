@@ -20,6 +20,6 @@ def test_init():
 def test_run(entries):
   test.assertPublish('s1', 'owntracks/device/xxx', '{"_type":"location","acc":78,"alt":0,"batt":86,"conn":"w","inregions":["Region"],"lat":45.123,"lon":12.123,"tid":"ic","tst":1546871086,"vac":0,"vel":0}', 
     assertEvents = {
-      'location': {'latitude': 45.123, 'longitude': 12.123, 'altitude': 0, 'radius': 78, 'radius_unit': 'm', 'regions': ['Region'], 'source': 'owntracks'},
+      'location': {'latitude': 45.123, 'longitude': 12.123, 'altitude': 0, 'radius': 78, 'radius:unit': 'm', 'regions': ['Region'], 'source': 'owntracks'},
       'clock': {'value': 1546871086}
     })

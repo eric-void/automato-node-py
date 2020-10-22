@@ -27,7 +27,7 @@ def entry_install(installer_entry, entry, conf):
         'description': _('Owntracks app sent device location'),
         'type': 'object',
         'events': {
-          'location': "js:(payload['_type'] == 'location' ? {latitude: payload['lat'], longitude: payload['lon'], altitude: payload['alt'], radius: payload['acc'], radius_unit: 'm', regions: 'inregions' in payload ? payload['inregions'] : [], source: 'owntracks'} : false)",
+          'location': "js:(payload['_type'] == 'location' ? {latitude: payload['lat'], longitude: payload['lon'], altitude: payload['alt'], radius: payload['acc'], 'radius:unit': 'm', regions: 'inregions' in payload ? payload['inregions'] : [], source: 'owntracks'} : false)",
           'clock': "js:({value: payload['tst']})",
         }
       },

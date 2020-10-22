@@ -26,7 +26,7 @@ definition = {
       'retain': True,
       'handler': 'publish',
       'events': {
-        'netspeed': 'js:({"download": payload["download_bps"], "download_unit": "bps", "upload": payload["upload_bps"], "upload_unit": "bps", "ping": payload["ping_ms"], "ping_unit": "ms", "error": payload["error"]})',
+        'netspeed': 'js:({"download": payload["download_bps"], "download:unit": "bps", "upload": payload["upload_bps"], "upload:unit": "bps", "ping": payload["ping_ms"], "ping:unit": "ms", "error": payload["error"]})',
         'clock': 'js:({"value": t(payload["time"])})',
       }
     }

@@ -72,7 +72,7 @@ def test_run(entries):
   t2 = system.time()
   test.assertPublish('t2a', 'owntracks/device/xxx', '{"_type":"location","acc":78,"alt":0,"batt":86,"conn":"w","inregions":["Region"],"lat":35.123,"lon":22.123,"tid":"ic","tst":1546871086,"vac":0,"vel":0}', 
     assertEvents = {
-      'location': {'latitude': 35.123, 'longitude': 22.123, 'altitude': 0, 'radius': 78, 'radius_unit': 'm', 'regions': ['Region'], 'source': 'owntracks'},
+      'location': {'latitude': 35.123, 'longitude': 22.123, 'altitude': 0, 'radius': 78, 'radius:unit': 'm', 'regions': ['Region'], 'source': 'owntracks'},
       'clock': {'value': 1546871086}
     },
     assertSubscribeNotReceive = ['home/presence/in'])
