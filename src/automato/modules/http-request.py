@@ -5,10 +5,13 @@ import logging
 import requests
 import re
 
+from automato.core import utils
+
 definition = {
   'config': {
     'charset': 'utf-8',
     'url': '',
+    'request_timeout': 10,
   },
   
   'description': _('Publish content by parsing an HTTP request'),
@@ -47,7 +50,7 @@ def publish(entry, topic, definition):
   content = False
   if url:
     try:
-      page = requests.get(url)
+      page = requests.get(url timeout = utils.read_duration(entry.config['request_timeout']))
       content = page.content.decode(entry.config['charset'])
     except:
       logging.exception("Failed fetching %s" % (url))
