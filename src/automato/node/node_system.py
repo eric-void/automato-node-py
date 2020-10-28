@@ -308,9 +308,13 @@ def get_handler(entry, method):
   return lambda entry, *args, **kwargs: call_handlers(handlers, entry, *args, **kwargs)
 
 def call_handlers(handlers, entry, *args, **kwargs):
+  ret = None
   for h in handlers:
-    ret = h(entry, *args, **kwargs)
-  return ret;
+    try:
+      ret = h(entry, *args, **kwargs)
+    except:
+      logging.exception("#{id}> exception in calling handler {h}".format(id = entry.id, h = h))
+  return ret
 
 def entry_handlers_add_lambda(entry):
   return lambda method, key, handler: entry_handlers_add(entry, method, key, handler)
@@ -331,7 +335,12 @@ def entry_invoke(entry, method, *args, **kwargs):
   func = get_handler(entry, method)
   if func:
     logging.debug("#{entry}> invoking {method} ...".format(entry=entry.id, method=method))
-    return func(entry, *args, **kwargs)
+    ret = None
+    try:
+      ret = func(entry, *args, **kwargs)
+    except:
+      logging.exception("#{id}> exception in entry_invoke of method {method}".format(id = entry.id, method = method))
+    return ret
 
 def entry_invoke_delayed(entry, timer_key, delay, method, *args, _pass_entry = True, **kwargs):
   if isinstance(entry, str):
@@ -344,12 +353,24 @@ def entry_invoke_delayed(entry, timer_key, delay, method, *args, _pass_entry = T
   if func:
     cancel_entry_invoke_delayed(entry, timer_key)
     if _pass_entry:
-      cargs = [entry] + list(args)
-    else:
-      cargs = list(args)
-    entry.timers[timer_key] = threading.Timer(delay, func, args = cargs, kwargs = kwargs)
+      args = [entry] + list(args)
+    #else:
+    #  args = list(args)
+    #entry.timers[timer_key] = threading.Timer(delay, func, args = args, kwargs = kwargs)
+    #entry.timers[timer_key].start()
+    args = [func, method, entry.id] + list(args);
+    entry.timers[timer_key] = threading.Timer(delay, entry_invoke_delayed_wrapper, args = args, kwargs = kwargs)
     entry.timers[timer_key].start()
     
+# wrapper for threads invokation, used to catch and log exception
+def entry_invoke_delayed_wrapper(func, method, entry_id, *args, **kwargs):
+  _s = system._stats_start()
+  try:
+    func(*args, **kwargs)
+  except:
+    logging.exception("#{id}> exception in running method {method} (delayed)".format(id = entry_id, method = method))
+  system._stats_end('entry_invoke_delayed:' + entry_id + '.' + str(method), _s)
+
 def cancel_entry_invoke_delayed(entry, timer_key):
   if timer_key in entry.timers:
     entry.timers[timer_key].cancel()
@@ -361,7 +382,10 @@ def entries_invoke(method, *args, **kwargs):
     func = get_handler(entry, method)
     if func:
       logging.debug("#{entry}> invoking {method} ...".format(entry = entry_id, method = method))
-      ret = func(entry, *args, **kwargs)
+      try:
+        ret = func(entry, *args, **kwargs)
+      except:
+        logging.exception("#{id}> exception in entries_invoke of method {method}".format(id = entry.id, method = method))
   return ret
 
 # Parametri speciali: 
@@ -422,7 +446,7 @@ def entry_invoke_threaded_wrapper(func, method, entry_id, *args, **kwargs):
     func(*args, **kwargs)
   except:
     logging.exception("#{id}> exception in running method {method} (threaded)".format(id = entry_id, method = method))
-  system._stats_end('entry_invoke:' + entry_id + '.' + method, _s)
+  system._stats_end('entry_invoke:' + entry_id + '.' + str(method), _s)
 
 def entry_implements(entry, method):
   if isinstance(entry, str):
