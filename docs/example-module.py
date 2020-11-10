@@ -217,6 +217,10 @@ definition = {
       # response: in alternativa si può usare "publish" (che pubblica anche il topic specificato)
       'response': [ 'topic' ], # L'elenco di topic (logici) dati in risposta quando si fa questa richiesta
       'response': [ { topic: 'topic/#', count: 10, duration: 10 } ], # Può inviare piu' risposte (massimo 10) e aspetta 10 secondi per riceverle tutte. For topic, you can use mqtt patterns (topic/#) or regexp (/topic/.*/)
+      # nota su response e system.subscribe_response(... final ...). Una risposta è considerata finale se c'è stato almeno 1 messaggio di ogni topic specificato con count >= 1 (se il topic è stato specificato senza 'count', viene considerato 'count': 1)
+      # quindi response [ 'topic1', 'topic2'] è final se sono stati ricevuti entrambi, [ { topic: 'topic1', count: 0}, { topic: 'topic2', count: 0} ] basta un response qualsiasi perchè sia finale, [ 'topic1', { topic: 'topic2', count: 0} ] indica che 'topic1' ci deve essere, 'topic2' è facoltativo
+      # da notare che final può essere True più volte. Nell'ultimo esempio al primo 'topic1' viene chiamata la callback con final = True. Se poi arriva un 'topic2' viene chiamato di nuovo, sempre con final = True.
+      # il numero di count > 1 non serve per capire se è final, ma solo per decidere dopo quanti messaggi la callback non viene più chiamata
       'type': '...', # Vedi sopra (notare che è il tipo di PAYLOAD associato al topic che il nodo riceve, non il tipo di risposta)
       
       # [L.???? TODO SERVE???]
@@ -276,7 +280,11 @@ definition = {
   },
 
   # TODO [L.0]
-  "events_passthrough": [ "event_reference", ...],
+  "events_passthrough": "event_reference", # equivalent to [{ "on": "event_reference", "remove_keys": true}],
+  "events_passthrough": [
+    { "on": "entry.event(condition)", "rename": "event2", "init": "js: code", "remove_keys": true},
+    "entry.event(condition)", # equivalent to { "on": "entry.event(condition)", "remove_keys": true},
+  ],
   
   # [L.2]
   "on": {
