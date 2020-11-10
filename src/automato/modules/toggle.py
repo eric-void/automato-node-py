@@ -235,6 +235,9 @@ def event_listener(entry, source_entry, eventname, eventdata):
   # If i've not received events from this entry before, or long time ago, i consider this as an initialization, so i don't call on_set (no output change, no timers... i don't consider this as a button press)
   if source_entry.id not in entry.data['toggle_input_values'] or system.time() - entry.data['toggle_input_values'][source_entry.id][1] > 3600:
     entry.data['toggle_input_values'][source_entry.id] = [value, system.time()]
+    entry.data['toggle_output_value'] = value
+    entry.data['toggle_output_value_time'] = system.time()
+    entry.data['toggle_changed'] = False
   # I consider this input event only if different from previous detection
   elif value != entry.data['toggle_input_values'][source_entry.id][0]:
     _on_set(entry, { 'state': value }, source_entry)
@@ -257,7 +260,7 @@ def _on_set(entry, payload, source_entry = None):
     if 'toggle_defaults' in entry.data:
       payload = { ** entry.data['toggle_defaults'], ** payload }
     if 'toggle_defaults' in entry.config:
-      payload = { ** entry.config['toggle_defaults'], ** payload }    
+      payload = { ** entry.config['toggle_defaults'], ** payload }
       
     entry.data['toggle_input_values']['_mqtt' if source_entry is None else source_entry.id] = [payload['state'], system.time()]
     set_output(entry, payload['state'], source_entry)
@@ -294,9 +297,9 @@ def set_output(entry, value, source_entry = None):
             entry.data['toggle_output_queue'].append([system.time() + entry.data['toggle_debounce_time'], action_entry.id, value])
     entry.data['toggle_output_value'] = value
     entry.data['toggle_output_value_time'] = system.time()
-    entry.request.toggle_changed = True
+    entry.data['toggle_changed'] = True
   else:
-    entry.request.toggle_changed = False
+    entry.data['toggle_changed'] = False
 
 def on_toggle(entry, subscribed_message):
   payload2 = { 'state': 1 - entry.data['toggle_output_value']}
@@ -316,7 +319,7 @@ def publish(entry, topic, definition):
   res = {
     'state': entry.data['toggle_output_value'],
     'type': 'toggle',
-    'changed': hasattr(entry.request, 'toggle_changed') and entry.request.toggle_changed,
+    'changed': entry.data['toggle_changed'] if 'toggle_changed' in entry.data else False,
     'last_changed': entry.data['toggle_output_value_time'],
     'timer-state': 1 if 'toggle_timer_to' in entry.data and entry.data['toggle_timer_to'] > 0 else 0,
     'timer-to': entry.data['toggle_timer_to'] if 'toggle_timer_to' in entry.data and entry.data['toggle_timer_to'] > 0 else 0,
@@ -326,6 +329,7 @@ def publish(entry, topic, definition):
     'input_values': entry.data['toggle_input_values'],
   }
   entry.publish('', res)
+  entry.data['toggle_changed'] = False
 
 def on_set_defaults(entry, subscribed_message):
   if isinstance(subscribed_message.payload, dict):
