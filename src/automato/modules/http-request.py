@@ -50,7 +50,7 @@ def publish(entry, topic, definition):
   content = False
   if url:
     try:
-      page = requests.get(url timeout = utils.read_duration(entry.config['request_timeout']))
+      page = requests.get(url, timeout = utils.read_duration(entry.config['request_timeout']))
       content = page.content.decode(entry.config['charset'])
     except:
       logging.exception("Failed fetching %s" % (url))
