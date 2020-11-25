@@ -120,7 +120,7 @@ def publish_wan_ip(entry, topic_rule, topic_definition):
     try:
       output = subprocess.check_output(entry.config['wan-ip-ifstatus-command'], shell=True).decode("utf-8")
       if output:
-        data = json.loads(output)
+        data = utils.json_import(output)
         if data and "ipv4-address" in data and "address" in data["ipv4-address"][0]:
           entry.publish('./wan-ip', { 'wan-ip': str(data["ipv4-address"][0]["address"]), 'time': system.time() })
         else:
@@ -166,9 +166,10 @@ def on_wan_reconnect(entry, subscribed_message):
 
   if entry.config['wan-ip-detect-method'] == 'if' and entry.config['wan-ip-ifrenew-command']:
     try:
+      entry.publish('./wan-reconnect/response', "Reconnecting ...")
       output = subprocess.check_output(entry.config['wan-ip-ifrenew-command'], shell=True).decode("utf-8")
       if output:
-        data = json.loads(output)
+        data = utils.json_import(output)
         if data:
           entry.publish('./wan-reconnect/response', "Reconnected")
           return

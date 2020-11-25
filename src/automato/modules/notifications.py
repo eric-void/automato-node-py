@@ -8,6 +8,7 @@ import os
 import json
 
 from automato.core import system
+from automato.core import utils
 from automato.node import node_system as node
 from automato.core.notifications import notifications_levels
 
@@ -70,7 +71,7 @@ def init(entry):
     with entry.storage.fileOpen(entry.config['storage'], 'r') as f:
       for line in f:
         if line.strip():
-          subscription = json.loads(line)
+          subscription = utils.json_import(line)
           entry.notification_subscriptions.append(subscription)
   
   if 'history' not in entry.data:
@@ -138,7 +139,7 @@ def on_notifications_subscribe(entry, subscribed_message):
         line = { "driver": data.group(1), "pattern": matches.group(1), "data": save, "time": system.time()}
         entry.notification_subscriptions.append(line)
         with entry.storage.fileOpen(entry.config['storage'], 'a') as f:
-          f.write(json.dumps(line) + '\n')
+          f.write(utils.json_export(line) + '\n')
         entry.publish('notifications/response', _("Client subscribed to notification pattern {pattern}: {driver}:{data}").format(pattern = line["pattern"], driver = line["driver"], data = line["data"]))
         logging.debug('#{id}> Client subscribed to notification pattern {pattern}: {driver}:{data}'.format(id = entry.id, pattern = line["pattern"], driver = line["driver"], data = line["data"]))
 
@@ -166,7 +167,7 @@ def on_notifications_unsubscribe(entry, subscribed_message):
         with entry.storage.fileOpen(entry.config['storage'] + '.new', 'w') as new_file:
           for line in old_file:
             if line.strip():
-              s = json.loads(line)
+              s = utils.json_import(line)
               if not (s["driver"] == found["driver"] and s["pattern"] == found["pattern"] and s["data"] == found["data"] and s["time"] == found["time"]):
                 new_file.write(line + '\n')
       if entry.storage.fileExists(entry.config['storage'] + '.new'):

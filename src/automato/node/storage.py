@@ -6,6 +6,7 @@ import os
 import json
 
 from automato.core import system
+from automato.core import utils
 
 path = './data'
 
@@ -51,7 +52,7 @@ def _retrieveDataFrom(entry, filename):
       c = f.read()
       if c:
         try:
-          entry.data = json.loads(c)
+          entry.data = utils.json_import(c)
           logging.debug("#{id}> storage: retrieved data from {filename}: {data}".format(id = entry.id, filename = filename, data = entry.data if len(str(entry.data)) < 500 else str(entry.data)[:500] + '...'))
           return True
         except:
@@ -73,12 +74,12 @@ def storeData(entry, blocking = True):
     cmpdata = repr(entry.data)
     data = None
     if entry.store_data_saved != cmpdata:
-      data = json.dumps(entry.data)
+      data = utils.json_export(entry.data)
       _storeDataTo(entry, entry.node_name + '_data_' + entry.id_local + '.json', data)
       entry.store_data_saved = cmpdata
     if system.time() - entry.store_backup_time > STORAGE_BACKUP_TIME:
       if not data:
-        data = json.dumps(entry.data)
+        data = utils.json_export(entry.data)
       _storeDataTo(entry, entry.node_name + '_data_' + entry.id_local + '.backup.json', data)
       entry.store_backup_time = system.time()
 
