@@ -21,6 +21,13 @@ def test_init():
         "entry_topic": "home/toggle-test",
         "toggle_devices": "shelly-test",
       },
+      {
+        "device": "shellydimmer-test",
+        "device_type": "shellydimmer",
+        "shelly_id": "YYYYYY",
+
+        "events_listen": [".output", ".input", ".connected", ".temperature", ".humidity", ".energy", ".clock"]
+      },
     ],
   })
 
@@ -46,3 +53,10 @@ def test_run(entries):
   test.assertAction('debounce3', 'toggle-test', 'output-set', {'value': 0}, assertSubscribe = {'shellies/shellyswitch-XXXXXX/relay/0/command': 'off'})
   test.assertAction('debounce4', 'toggle-test', 'output-set', {'value': 1}, assertSubscribe = {'shellies/shellyswitch-XXXXXX/relay/0/command': 'on'})
   test.assertPublish('debounce5', 'shellies/shellyswitch-XXXXXX/relay/0', 'off', assertSubscribeNotReceive = [ 'shellies/shellyswitch-XXXXXX/relay/0/command' ])
+  
+  # Check shellydimmer
+  test.assertPublish('dget_on', 'shellies/shellydimmer-YYYYYY/light/0', 'off', assertEvents = {'output': {'value': 0, 'port': '0', 'port:def': ['0'], 'value:def': [0, 1], 'intensity:def': 'int', 'intensity:def:limits': [1,100]}})
+  test.assertPublish('dget_on2', 'shellies/shellydimmer-YYYYYY/light/0/status', {"ison": False, "has_timer": False, "timer_started": 0, "timer_duration": 0, "timer_remaining": 0, "mode": "white", "brightness": 50}, assertEvents = {'output': {'value': 0, 'port': '0', 'intensity': 50, 'port:def': ['0'], 'value:def': [0, 1], 'intensity:def': 'int', 'intensity:def:limits': [1,100] }})
+  test.assertAction('dset_on', 'shellydimmer-test', 'output-set', {'value': 1 }, assertSubscribe = {'shellies/shellydimmer-YYYYYY/light/0/set': {"turn": "on"}})
+  test.assertAction('dset_on2', 'shellydimmer-test', 'output-set', {'intensity': 100 }, assertSubscribe = {'shellies/shellydimmer-YYYYYY/light/0/set': {"brightness": 100}})
+  test.assertAction('dset_on3', 'shellydimmer-test', 'output-set', {'value': 0, 'intensity': 0 }, assertSubscribe = {'shellies/shellydimmer-YYYYYY/light/0/set': {"turn": "off", "brightness": 0}})
