@@ -183,7 +183,8 @@ definition = {
       "events": { # Variabili a disposizione di definizione: {topic}, {payload}, {matches}
         "state": "js:({value: payload['value'] == 'on' ? 1 : 0, value2: 0 + payload['value2']})",
         "clock": "js:({value: payload['time']})",
-        'location': "js:(payload['_type'] == 'location' ? {latitude: payload['lat'], longitude: payload['lon'], altitude: payload['alt'], radius: payload['acc'], radius:unit: 'm', regions: 'inregions' in payload ? payload['inregions'] : [], source: 'owntracks'} : null)",
+        "location": "js:(payload['_type'] == 'location' ? {latitude: payload['lat'], longitude: payload['lon'], altitude: payload['alt'], radius: payload['acc'], radius:unit: 'm', regions: 'inregions' in payload ? payload['inregions'] : [], source: 'owntracks'} : null)",
+        "test": 'js:let payload = {}; if ("value" in params) payload.turn = params["value"] ? "on" : "off"; if ("intensity" in params) payload.brightness = params["intensity"]; payload',
         "eventname": ["js:...", "js:..."], # Se è possibile invocare più eventi con lo stesso nome è possibile specificare un array di definizioni
         "eventname:keys": [ "port", "channel"], # Le chiavi da usare per discriminare gli eventi (e la sua cache), da usare al posto di "event_keys" di entry (o globale). WARN: Se vengono dichiarati più ":keys" per lo stesso eventname, ne verrà considerato solo uno (di solito l'ultimo)
         "eventname:init": { "unit": "W" }, # Inizializzazione per gli stati, fatta a caricamento dell'entry. WARN: Se vengono dichiarati più ":init" per lo stesso eventname, ne verrà considerato solo uno (di solito l'ultimo)
