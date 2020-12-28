@@ -70,7 +70,7 @@ def entry_install(installer_entry, entry, conf):
       'topic': '/^' + base_topic + t['relay_name'] + '/([0-9]+)/status$/',
       'description': _('Current full output status of the relay'),
       'type': 'object',
-      'notify': _("Shelly device '{caption}' relay #{matches[1]} full state is: {_[payload]}"),
+      'notify': _("Shelly device '{caption}' relay #{matches[1]} full state is: {payload}"),
       'notify_level': 'debug',
       'events': {
         'output': 'js:({value: payload["ison"] ? 1 : 0, intensity: payload["brightness"], port: matches[1]})',
