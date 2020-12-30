@@ -20,9 +20,8 @@ entry.created
 # last_seen(int/timestamp): data dell'ultimo messaggio del quale l'entry è risultato publisher (in caso di publisher multipli, per ognuno è impostato il last_seen).
 entry.last_seen
 
-
-# node (dict): l'intera configurazione del nodo (quella definita nel config caricato via riga di comando)
-entry.node = {}
+# node_config (dict): l'intera configurazione del nodo (quella definita nel config caricato via riga di comando)
+entry.node_config = {}
 
 # definition (dict): la definizione completa dell'entry (arricchita da module.definition e hook module.load(), se l'entry è un module)
 # NOTA: contiene SEMPRE entry_topic, topic_root, publish, subscribe
