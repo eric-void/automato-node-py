@@ -181,7 +181,7 @@ definition = {
       # WARN: il risultato delle esecuzioni di codice degli eventi può essere messo in cache, e quindi è importante che il codice sia DETERMINISTICO rispetto ai parametri: se do gli stessi parametri 2 volte, il codice deve dare lo stesso risultato!
       "events": { # Variabili a disposizione di definizione: {topic}, {payload}, {matches}
         "state": "js:({value: payload['value'] == 'on' ? 1 : 0, value2: 0 + payload['value2']})",
-        "clock": "js:({value: payload['time']})",
+        "clock": "js:({value: parseInt(payload['time'])})",
         "location": "js:(payload['_type'] == 'location' ? {latitude: payload['lat'], longitude: payload['lon'], altitude: payload['alt'], radius: payload['acc'], radius:unit: 'm', regions: 'inregions' in payload ? payload['inregions'] : [], source: 'owntracks'} : null)",
         "test": 'js:let payload = {}; if ("value" in params) payload.turn = params["value"] ? "on" : "off"; if ("intensity" in params) payload.brightness = params["intensity"]; payload',
         "eventname": ["js:...", "js:..."], # Se è possibile invocare più eventi con lo stesso nome è possibile specificare un array di definizioni
