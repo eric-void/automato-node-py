@@ -290,7 +290,7 @@ definition = {
   "on": {
     "entry_id.event(condition)": { # condition è nella forma "js:params['value'] == 1 && params['value'] == 1" ...
       "handler": on_event, # def on_event(entry, eventname, eventdata): eventdata = {'params': {...}, 'changed_params': {...}}
-      "script": [...], # "entry" passato allo script è quello che ha imposta questa definition, mentre "on_entry" è quello specificato nell'"on" (del quale è stato preso l'evento)
+      "script": [...], # Parametry passati: entry, on_entry, eventname, eventdata, params. "entry" passato allo script è quello che ha impostato questa definition, mentre "on_entry" è quello specificato nell'"on" (del quale è stato preso l'evento)
       "do": "entry@NODE.action(init)", # init è nella forma "js:params['value'] = 1; params['value'] = 1;"
       "do": ["entry@NODE.action(init)", ...],
       "do_if_event_not_match": False, # Imposta "if_event_not_match" in system.do_action (default: False). In pratica il do viene fatto solo se l'evento corrispondente non è già in quello stato

@@ -111,7 +111,7 @@ def system_loaded(localentry, entries):
         if 'script' in entry.definition['on'][s]:
           script = decode_script(entry.definition['on'][s]['script'])
           #logging.debug("#{id}@scripting> loaded script for topic on: {topic}\n--------------------\n{script}".format(id = m, topic = s, script = script))
-          entry.definition['on'][s]['handler'] = _exec_script_lambda(entry, "on_entry = args[0]; eventname = args[1]; params = args[2]\n" + script)
+          entry.definition['on'][s]['handler'] = _exec_script_lambda(entry, "on_entry = args[0]; eventname = args[1]; eventdata = args[2]; params = eventdata['params'];\n" + script)
           entry.definition['on'][s].pop('script', None)
   
 def exec_script(entry, code, *args, **kwargs):
