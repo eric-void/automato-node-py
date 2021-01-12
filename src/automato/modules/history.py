@@ -30,7 +30,7 @@ def load(entry):
 
 def on_all_events(installer_entry, entry, eventname, eventdata, caller, published_message):
   if eventname not in installer_entry.config['ignore_events']:
-    with entry.history_event_buffer_lock:
+    with installer_entry.history_event_buffer_lock:
       if entry.id not in installer_entry.history_event_buffer:
         installer_entry.history_event_buffer[entry.id] = {}
       if eventname not in installer_entry.history_event_buffer[entry.id]:
