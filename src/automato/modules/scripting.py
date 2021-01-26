@@ -60,60 +60,62 @@ def scripting_globals(entry, _globals):
     }
   }
 
-def system_loaded(localentry, entries):
-  for m in entries:
-    entry = entries[m]
-    entry.script_exec_depth = 0
-    entry.script_exec = _exec_script_entry_lambda(entry)
-    entry.script_eval = _eval_script_entry_lambda(entry)
 
-    if 'data' in entry.definition:
-      for v in entry.definition['data']:
-        if v not in entry.data:
-          entry.data[v] = entry.definition['data'][v]
-    if 'methods' in entry.definition:
-      for method in entry.definition['methods']:
-        script = decode_script(entry.definition['methods'][method])
-        #logging.debug("#{id}@scripting> loaded method: {method}\n--------------------\n{script}".format(id = m, method = method, script = script))
-        # TODO i method base (chiamati tramite system.entry_invoke) sono in formato (entry, *args, **kwargs). I metodi chiamabili da script sono in formato (*args, **kwargs). Per questo la differenza, ma non è molto elegante cosi'
-        if method in ['init', 'start']:
-          #setattr(entry.module, method, _exec_script_lambda_noentry(script))
-          entry.methods[method] = _exec_script_lambda_noentry(script)
-        else:
-          entry.methods[method] = _exec_script_lambda(entry, script)
-          
-    if 'subscribe' in entry.definition:
-      for s in entry.definition['subscribe']:
-        if isinstance(entry.definition['subscribe'][s], dict) and 'script' in entry.definition['subscribe'][s]:
-          script = decode_script(entry.definition['subscribe'][s]['script'])
-          #logging.debug("#{id}@scripting> loaded script for topic subscription: {topic}\n--------------------\n{script}".format(id = m, topic = s, script = script))
-          entry.definition['subscribe'][s]['handler'] = _exec_script_lambda(entry, "subscribed_message = args[1]; topic = args[1].topic; payload = args[1].payload; matches = args[1].matches\n" + script)
-          entry.definition['subscribe'][s].pop('script', None)
+def entry_load(self_entry, entry):
+  entry.script_exec_depth = 0
+  entry.script_exec = _exec_script_entry_lambda(entry)
+  entry.script_eval = _eval_script_entry_lambda(entry)
 
-    if 'publish' in entry.definition:
-      for s in entry.definition['publish']:
-        if 'script' in entry.definition['publish'][s]:
-          script = decode_script(entry.definition['publish'][s]['script'])
-          #logging.debug("#{id}@scripting> loaded script for topic publishing: {topic}\n--------------------\n{script}".format(id = m, topic = s, script = script))
-          entry.definition['publish'][s]['handler'] = _exec_script_lambda(entry, "topic = args[1]; topic_definition = args[2]\n" + script)
-          entry.definition['publish'][s].pop('script', None)
+  if 'data' in entry.definition:
+    for v in entry.definition['data']:
+      if v not in entry.data:
+        entry.data[v] = entry.definition['data'][v]
+  if 'methods' in entry.definition:
+    for method in entry.definition['methods']:
+      script = decode_script(entry.definition['methods'][method])
+      #logging.debug("#{id}@scripting> loaded method: {method}\n--------------------\n{script}".format(id = m, method = method, script = script))
+      # TODO i method base (chiamati tramite system.entry_invoke) sono in formato (entry, *args, **kwargs). I metodi chiamabili da script sono in formato (*args, **kwargs). Per questo la differenza, ma non è molto elegante cosi'
+      if method in ['init', 'start']:
+        #setattr(entry.module, method, _exec_script_lambda_noentry(script))
+        entry.methods[method] = _exec_script_lambda_noentry(script)
+      else:
+        entry.methods[method] = _exec_script_lambda(entry, script)
+        
+  if 'subscribe' in entry.definition:
+    for s in entry.definition['subscribe']:
+      if isinstance(entry.definition['subscribe'][s], dict) and 'script' in entry.definition['subscribe'][s]:
+        script = decode_script(entry.definition['subscribe'][s]['script'])
+        #logging.debug("#{id}@scripting> loaded script for topic subscription: {topic}\n--------------------\n{script}".format(id = m, topic = s, script = script))
+        entry.definition['subscribe'][s]['handler'] = _exec_script_lambda(entry, "subscribed_message = args[1]; topic = args[1].topic; payload = args[1].payload; matches = args[1].matches\n" + script)
+        entry.definition['subscribe'][s].pop('script', None)
 
-        """
-        if 'notify_script' in entry.definition['publish'][s]:
-          script = decode_script(entry.definition['publish'][s]['notify_script'])
-          #logging.debug("#{id}> loaded script for topic publishing notification: {topic}\n--------------------\n{script}".format(id = m, topic = s, script = script))
-          entry.definition['publish'][s]['notify_handler'] = _exec_script_lambda(entry, "topic = args[1]; payload = args[2]\n" + script)
-          entry.definition['publish'][s].pop('notify_script', None)
-        """
-    
-    if 'on' in entry.definition:
-      for s in entry.definition['on']:
-        if 'script' in entry.definition['on'][s]:
-          script = decode_script(entry.definition['on'][s]['script'])
-          #logging.debug("#{id}@scripting> loaded script for topic on: {topic}\n--------------------\n{script}".format(id = m, topic = s, script = script))
-          entry.definition['on'][s]['handler'] = _exec_script_lambda(entry, "on_entry = args[0]; eventname = args[1]; eventdata = args[2]; params = eventdata['params'];\n" + script)
-          entry.definition['on'][s].pop('script', None)
+  if 'publish' in entry.definition:
+    for s in entry.definition['publish']:
+      if 'script' in entry.definition['publish'][s]:
+        script = decode_script(entry.definition['publish'][s]['script'])
+        #logging.debug("#{id}@scripting> loaded script for topic publishing: {topic}\n--------------------\n{script}".format(id = m, topic = s, script = script))
+        entry.definition['publish'][s]['handler'] = _exec_script_lambda(entry, "topic = args[1]; topic_definition = args[2]\n" + script)
+        entry.definition['publish'][s].pop('script', None)
+
+      """
+      if 'notify_script' in entry.definition['publish'][s]:
+        script = decode_script(entry.definition['publish'][s]['notify_script'])
+        #logging.debug("#{id}> loaded script for topic publishing notification: {topic}\n--------------------\n{script}".format(id = m, topic = s, script = script))
+        entry.definition['publish'][s]['notify_handler'] = _exec_script_lambda(entry, "topic = args[1]; payload = args[2]\n" + script)
+        entry.definition['publish'][s].pop('notify_script', None)
+      """
   
+  if 'on' in entry.definition:
+    for s in entry.definition['on']:
+      if 'script' in entry.definition['on'][s]:
+        script = decode_script(entry.definition['on'][s]['script'])
+        #logging.debug("#{id}@scripting> loaded script for topic on: {topic}\n--------------------\n{script}".format(id = m, topic = s, script = script))
+        entry.definition['on'][s]['handler'] = _exec_script_lambda(entry, "on_entry = args[0]; eventname = args[1]; eventdata = args[2]; params = eventdata['params']; caller = args[3]; published_message = args[4]; \n" + script)
+        entry.definition['on'][s].pop('script', None)
+
+def entry_unload(self_entry, entry):
+  pass
+
 def exec_script(entry, code, *args, **kwargs):
     # WARN: Ciò che metto in "globals" nella mia exec è "read-only" (nel senso che le modifiche che verranno fatte NON si rifletteranno all'esterno)
     # Invece se modifico __locals questo si rifletterà, purchè __locals sia assegnato direttamente a entry.data. Se faccio __locals = { **entry.data } allora le modifiche non si rifletteranno più

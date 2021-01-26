@@ -73,9 +73,9 @@ definition = {
   }
 }
 
-def entry_install(installer_entry, entry, conf):
-  entry.on("connected", lambda _entry, _eventname, _eventdata: on_entry_event_connected(installer_entry, _entry, _eventname, _eventdata))
-  entry.on("location", lambda _entry, _eventname, _eventdata: on_entry_event_location(installer_entry, _entry, _eventname, _eventdata))
+def entry_install(self_entry, entry, conf):
+  entry.on("connected", lambda _entry, _eventname, _eventdata, caller, published_message: on_entry_event_connected(self_entry, _entry, _eventname, _eventdata, caller, published_message), None, self_entry)
+  entry.on("location", lambda _entry, _eventname, _eventdata, caller, published_message: on_entry_event_location(self_entry, _entry, _eventname, _eventdata, caller, published_message), None, self_entry)
 
 def init(entry):
   if not 'presence' in entry.data:
@@ -182,24 +182,24 @@ def publish(entry, topic, definition):
   exports(entry)
   publish_status(entry)
 
-def on_entry_event_connected(installer_entry, entry, eventname, eventdata):
+def on_entry_event_connected(self_entry, entry, eventname, eventdata, caller, published_message):
   params = eventdata['params']
   if ("temporary" not in params or not params["temporary"]) and "presence_detect" in entry.definition:
     if params['value']:
-      presence_method_detected(installer_entry, entry.definition["presence_detect"], 'connected/' + entry.id + (('.' + str(params['key'])) if 'key' in params else ''))
+      presence_method_detected(self_entry, entry.definition["presence_detect"], 'connected/' + entry.id + (('.' + str(params['key'])) if 'key' in params else ''))
     else:
-      presence_method_gone_away(installer_entry, entry.definition["presence_detect"], 'connected/' + entry.id + (('.' + str(params['key'])) if 'key' in params else ''), installer_entry.config["presence_connection_after_disconnect"])
+      presence_method_gone_away(self_entry, entry.definition["presence_detect"], 'connected/' + entry.id + (('.' + str(params['key'])) if 'key' in params else ''), self_entry.config["presence_connection_after_disconnect"])
 
-def on_entry_event_location(installer_entry, entry, eventname, eventdata):
+def on_entry_event_location(self_entry, entry, eventname, eventdata, caller, published_message):
   params = eventdata['params']
   if "presence_detect" in entry.definition:
-    if 'regions' in params and 'presence_home_regions' in installer_entry.config:
-      if [v for v in params['regions'] if v in installer_entry.config['presence_home_regions']]:
-        presence_method_detected(installer_entry, entry.definition["presence_detect"], 'location_region' + (('/' + params['source']) if 'source' in params else ''), utils.read_duration(installer_entry.config["presence_location_session_duration"]))
-    if 'latitude' in params and params['latitude'] > 0 and 'longitude' in params and params['longitude'] > 0 and "presence_home_location" in installer_entry.config:
-      distance = locations_distance((params['latitude'], params['longitude']), (installer_entry.config["presence_home_location"]["latitude"], installer_entry.config["presence_home_location"]["longitude"]))
-      if distance < installer_entry.config["presence_home_location"]["radius"] + (params['radius'] if 'radius' in params else 0):
-        presence_method_detected(installer_entry, entry.definition["presence_detect"], 'location' + (('/' + params['source']) if 'source' in params else ''), utils.read_duration(installer_entry.config["presence_location_session_duration"]))
+    if 'regions' in params and 'presence_home_regions' in self_entry.config:
+      if [v for v in params['regions'] if v in self_entry.config['presence_home_regions']]:
+        presence_method_detected(self_entry, entry.definition["presence_detect"], 'location_region' + (('/' + params['source']) if 'source' in params else ''), utils.read_duration(self_entry.config["presence_location_session_duration"]))
+    if 'latitude' in params and params['latitude'] > 0 and 'longitude' in params and params['longitude'] > 0 and "presence_home_location" in self_entry.config:
+      distance = locations_distance((params['latitude'], params['longitude']), (self_entry.config["presence_home_location"]["latitude"], self_entry.config["presence_home_location"]["longitude"]))
+      if distance < self_entry.config["presence_home_location"]["radius"] + (params['radius'] if 'radius' in params else 0):
+        presence_method_detected(self_entry, entry.definition["presence_detect"], 'location' + (('/' + params['source']) if 'source' in params else ''), utils.read_duration(self_entry.config["presence_location_session_duration"]))
 
 def locations_distance(origin, destination):
   """

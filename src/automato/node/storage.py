@@ -25,6 +25,9 @@ def entry_install(self, entry):
   entry.store_data_saved = None
   entry.store_backup_time = 0
 
+def entry_uninstall(self, entry):
+  pass
+
 def fileExists(file):
   return os.path.isfile(path + '/' + file)
 

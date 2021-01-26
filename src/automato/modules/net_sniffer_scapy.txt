@@ -25,3 +25,9 @@ ora lo scapy ufficiale supporta python3 https://github.com/secdev/scapy
 Installazione: https://scapy.readthedocs.io/en/latest/installation.html
 pip3 install --pre scapy[basic]
 (Non so se serve ancora tcpdump)
+
+202101: Se da l'errore:
+FileNotFoundError: [Errno 2] No such file or directory: b'liblibc.a'
+Eseguire:
+sudo ln -s -f /usr/lib64/libc.a /usr/lib64/liblibc.a
+@see https://stackoverflow.com/questions/65410481/filenotfounderror-errno-2-no-such-file-or-directory-bliblibc-a

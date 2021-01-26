@@ -74,27 +74,7 @@ ON OTHER ENTRIES:
  'schedule_groups': { ... groups ... } # job 'entry_id' property is filled with entry id (if not specified)
 """
 
-def entry_install(installer_entry, entry, conf):
-  if 'schedule' in conf:
-    if not isinstance(conf['schedule'], list):
-      conf['schedule'] = [ conf['schedule'] ]
-    for job in conf['schedule']:
-      installer_entry.definition['jobs'].append({
-        'entry_id': entry.id,
-        **job,
-      })
-  if 'schedule_groups' in conf:
-    for group in conf['schedule_groups']:
-      for job in conf['schedule_groups'][group]:
-        installer_entry.definition['jobs'].append({
-          'entry_id': entry.id,
-          'group': group,
-          **job,
-        })
-  
-def init(entry):
-  # TODO #if potrebbe essere anche su un intero gruppo
-  
+def load(entry):
   if 'enabled' not in entry.data:
     entry.data['enabled'] = True
     entry.data['timer_to'] = 0
@@ -106,51 +86,91 @@ def init(entry):
           'group': group,
           **job,
         })
-  
-  oldjobs = entry.data['jobs'] if 'jobs' in entry.data else []
-  oldgroups = entry.data['groups'] if 'groups' in entry.data else []
+        
+  entry.scheduler_oldjobs = entry.data['jobs'] if 'jobs' in entry.data else []
+  entry.scheduler_oldgroups = entry.data['groups'] if 'groups' in entry.data else []
   entry.data['jobs'] = {}
   entry.data['groups'] = {}
-  i = 0
-  now = system.time()
+  
   for job in entry.definition['jobs']:
-    if 'run_interval' in job or 'run_cron' in job:
-      jid = None
-      if 'id' in job:
-        jid = job['id']
-        del job['id']
-      if not jid or jid in entry.data['jobs']:
-        jid = ((job['group'] + '.') if 'group' in job and job['group'] else ((job['entry_id'] + '.') if 'entry_id' in job and job['entry_id'] else '')) + hashlib.sha1((str(i) + ':' + str(job)).encode('UTF-8')).hexdigest()[:16]
-      if jid in oldjobs:
-        job = { **oldjobs[jid], **job }
-      
-      if 'do' in job and isinstance(job['do'], str):
-        job['do'] = [ job['do'] ]
-      if 'enabled' not in job:
-        job['enabled'] = True
-      if 'max_delay' not in job:
-        job['max_delay'] = 60 if 'run_cron' in job else 0
-      job['max_delay'] = utils.read_duration(job['max_delay'])
-      if 'timer_to' not in job:
-        job['timer_to'] = 0
-      if 'last_run' not in job:
-        job['last_run'] = 0
-      if 'run_interval' in job:
-        job['run_interval'] = utils.read_duration(job['run_interval'])
-        if job['run_interval'] <= 0:
-          job = False
-      if job and 'run_cron' in job and not croniter.is_valid(job['run_cron']):
-        logging.error('#{id}> invalid cron rule: {cron} in job: {job}'.format(id = entry.id, cron = job['run_cron'], job = job))
-        job = False
-      if job:
-        if 'next_run' not in job or (job['max_delay'] > 0 and now >= job['next_run'] + job['max_delay']):
-          job_set_next_run(job)
-        entry.data['jobs'][jid] = job
-        
-        if 'group' in job and job['group'] and not job['group'] in entry.data['groups']:
-          entry.data['groups'][job['group']] = { 'enabled': True, 'timer_to': 0 } if job['group'] not in oldgroups else oldgroups[job['group']]
+    job_load(entry, job)
 
-    i = i + 1
+def job_load(entry, job):
+  jid = None
+  if 'run_interval' in job or 'run_cron' in job:
+    if 'id' in job:
+      jid = job['id']
+      del job['id']
+    if not jid or jid in entry.data['jobs']:
+      #jid = ((job['group'] + '.') if 'group' in job and job['group'] else ((job['entry_id'] + '.') if 'entry_id' in job and job['entry_id'] else '')) + hashlib.sha1((str(i) + ':' + str(job)).encode('UTF-8')).hexdigest()[:16]
+      i = 0
+      while True:
+        jid = ((job['group'] + '.') if 'group' in job and job['group'] else ((job['entry_id'] + '.') if 'entry_id' in job and job['entry_id'] else '')) + hashlib.sha1((str(job)).encode('UTF-8')).hexdigest()[:16] + (('_' + str(i)) if i else '')
+        if not (jid in entry.data['jobs']):
+          break;
+        i = i + 1
+    if jid in entry.scheduler_oldjobs:
+      job = { ** entry.scheduler_oldjobs[jid], ** job }
+    
+    if 'do' in job and isinstance(job['do'], str):
+      job['do'] = [ job['do'] ]
+    if 'enabled' not in job:
+      job['enabled'] = True
+    if 'max_delay' not in job:
+      job['max_delay'] = 60 if 'run_cron' in job else 0
+    job['max_delay'] = utils.read_duration(job['max_delay'])
+    if 'timer_to' not in job:
+      job['timer_to'] = 0
+    if 'last_run' not in job:
+      job['last_run'] = 0
+    if 'run_interval' in job:
+      job['run_interval'] = utils.read_duration(job['run_interval'])
+      if job['run_interval'] <= 0:
+        job = False
+    if job and 'run_cron' in job and not croniter.is_valid(job['run_cron']):
+      logging.error('#{id}> invalid cron rule: {cron} in job: {job}'.format(id = entry.id, cron = job['run_cron'], job = job))
+      job = False
+    if job:
+      if 'next_run' not in job or (job['max_delay'] > 0 and system.time() >= job['next_run'] + job['max_delay']):
+        job_set_next_run(job)
+      entry.data['jobs'][jid] = job
+      
+      if 'group' in job and job['group'] and not job['group'] in entry.data['groups']:
+        entry.data['groups'][job['group']] = { 'enabled': True, 'timer_to': 0 } if job['group'] not in entry.scheduler_oldgroups else entry.scheduler_oldgroups[job['group']]
+  return jid
+
+def job_unload(entry, jid):
+  if jid in entry.data['jobs']:
+    entry.scheduler_oldjobs[jid] = entry.data['jobs'][jid]
+    del entry.data['jobs'][jid]
+
+def entry_install(self_entry, entry, conf):
+  entry.schedule_jids = []
+  if 'schedule' in conf:
+    if not isinstance(conf['schedule'], list):
+      conf['schedule'] = [ conf['schedule'] ]
+    for job in conf['schedule']:
+      jid = job_load(self_entry, {
+        'entry_id': entry.id,
+        **job,
+      })
+      if jid:
+        entry.schedule_jids.append(jid)
+  if 'schedule_groups' in conf:
+    for group in conf['schedule_groups']:
+      for job in conf['schedule_groups'][group]:
+        jid = job_load(self_entry, {
+          'entry_id': entry.id,
+          'group': group,
+          **job,
+        })
+        if jid:
+          entry.schedule_jids.append(jid)
+
+def entry_uninstall(self_entry, entry, conf):
+  if entry.schedule_jids:
+    for jid in entry.schedule_jids:
+      job_unload(self_entry, jid)
 
 def run(entry):
   _s = system._stats_start()

@@ -72,7 +72,7 @@ definition = {
   }
 }
 
-def entry_install(installer_entry, entry, conf):
+def entry_install(self_entry, entry, conf):
   """
   Installs toggle specifications in passed entry
   """
@@ -113,7 +113,7 @@ def entry_install(installer_entry, entry, conf):
       if mentry:
         if not m['entry'] in required:
           required.append(m['entry'])
-        mentry.on(m['event'], event_listener_lambda(entry), m['condition'])
+        mentry.on(m['event'], event_listener_lambda(entry), m['condition'], self_entry)
       else:
         logging.error("{id}> invalid entry name in event listener definition: {definition}".format(id = entry.id, definition = e))
     else:
@@ -137,7 +137,7 @@ def entry_install(installer_entry, entry, conf):
   system.entry_definition_add_default(entry, {
     'required': required,
     'config': {
-      'toggle_debounce_time': installer_entry.config['toggle_debounce_time'],
+      'toggle_debounce_time': self_entry.config['toggle_debounce_time'],
     },
     'publish': {
       '@': {
@@ -156,7 +156,7 @@ def entry_install(installer_entry, entry, conf):
             'notify': _('Current status of {caption} is: {{payload[state!caption]}}, timer: {{payload[timer-to!strftime]}}').format(caption = entry.definition['caption']),
           }
         },
-        'run_interval': installer_entry.config['publish-interval'] if 'publish-interval' in installer_entry.config else 30,
+        'run_interval': self_entry.config['publish-interval'] if 'publish-interval' in self_entry.config else 30,
         'handler': publish,
         'events': {
           'output': 'js:({value: 0 + payload["state"], timer_to: 0 + payload["timer-to"]})'
@@ -199,9 +199,9 @@ def entry_install(installer_entry, entry, conf):
       },
     },
   })
-  entry.handlers_add('init', 'toggle', entry_init)
+  entry.handlers_add('init', 'toggle', _entry_init)
   
-def entry_init(entry):
+def _entry_init(entry):
   entry.data['toggle_boot_time'] = system.time()
   entry.data['toggle_output_queue'] = []
   entry.data['toggle_debounce_time'] = utils.read_duration(entry.definition['config']['toggle_debounce_time'])
@@ -227,9 +227,9 @@ def entry_init(entry):
       action_entry.do("output-get", {})
   
 def event_listener_lambda(entry):
-  return lambda source_entry, eventname, eventdata: event_listener(entry, source_entry, eventname, eventdata)
+  return lambda source_entry, eventname, eventdata, caller, published_message: event_listener(entry, source_entry, eventname, eventdata, caller, published_message)
 
-def event_listener(entry, source_entry, eventname, eventdata):
+def event_listener(entry, source_entry, eventname, eventdata, caller, published_message):
   value = 1 if eventdata['params']['value'] > 0 else 0
 
   # If i've not received events from this entry before, or long time ago, i consider this as an initialization, so i don't call on_set (no output change, no timers... i don't consider this as a button press)

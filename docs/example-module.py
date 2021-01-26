@@ -75,8 +75,8 @@ entry.script_eval(code, *args, **kwargs)
 # TODO NEW
 entry.events = {} # INTERNO: usare system.entry_events_supported(). A uso prevalentemente interno, per ogni evento c'è una lista di topic in cui è definito
 entry.actions = {} # INTERNO: usare system.entry_actions_supported(). Come sopra per events
-entry.on(event, listener, condition_eval = None)
-# def listener(entry, eventname, eventdata): ... eventdata = { 'params': {...}, 'changed_params': {...} }
+entry.on(event, listener, condition_eval = None, reference_entry = None, reference_tag = None)
+# def listener(entry, eventname, eventdata, caller, published_message): ... eventdata = { 'params': {...}, 'changed_params': {...} }, caller = "message|import|events_passthrough", published_message = source message (null for import)
 entry.do(action, params = {}, init_exec = None)
 
 # E' possibile arricchire entry con qualsiasi elemento si vuole mantenere tra le chiamate
@@ -289,8 +289,8 @@ definition = {
   # [L.2]
   "on": {
     "entry_id.event(condition)": { # condition è nella forma "js:params['value'] == 1 && params['value'] == 1" ...
-      "handler": on_event, # def on_event(entry, eventname, eventdata): eventdata = {'params': {...}, 'changed_params': {...}}
-      "script": [...], # Parametry passati: entry, on_entry, eventname, eventdata, params. "entry" passato allo script è quello che ha impostato questa definition, mentre "on_entry" è quello specificato nell'"on" (del quale è stato preso l'evento)
+      "handler": on_event, # def on_event(entry, eventname, eventdata, caller, published_message): eventdata = {'params': {...}, 'changed_params': {...}}, caller = "message|import|events_passthrough", published_message = source message (null for import)
+      "script": [...], # Parametry passati: entry, on_entry, eventname, eventdata, params, caller, published_message, caller = "message|import|events_passthrough", published_message = source message (null for import). "entry" passato allo script è quello che ha impostato questa definition, mentre "on_entry" è quello specificato nell'"on" (del quale è stato preso l'evento)
       "do": "entry@NODE.action(init)", # init è nella forma "js:params['value'] = 1; params['value'] = 1;"
       "do": ["entry@NODE.action(init)", ...],
       "do_if_event_not_match": False, # Imposta "if_event_not_match" in system.do_action (default: False). In pratica il do viene fatto solo se l'evento corrispondente non è già in quello stato
@@ -320,31 +320,40 @@ SYSTEM_HANDLER_ORDER_handlername = -10
 # Viene chiamato PRIMA di init
 # WARN: NON è possibile usare i metodi entry.*() [publish|notify] a questo livello, è possibile farlo solo da init(entry) in poi
 # Può invece usare .data
-def load(entry):
+def load(self_entry):
   # Se si vogliono prendere i metadati definiti da configurazione guardare su entry.definition (questi verrano poi uniti al risultato di questa chiamata)
-  # entry.config ancora non è initializzato, usare entry.definition['config']
-  if entry.definition['config']['myconfig']:
+  # self_entry.config ancora non è initializzato, usare self_entry.definition['config']
+  if self_entry.definition['config']['myconfig']:
     pass
   return {} # Ritorna la parte di definition che si vuole aggiungere/modificare
 
-# Primissima chiamata di un entry, fatta dopo aver caricato TUTTI gli entry ma prima di chiamare il loro init e di processare publish/subscribe/events/actions
+# OBSOLETE Primissima chiamata di un entry, fatta dopo aver caricato TUTTI gli entry ma prima di chiamare il loro init e di processare publish/subscribe/events/actions
 # Le restrizioni sono le stesse di load()
 # ATTENZIONE: questa chiamata viene effettuata anche ogni volta che c'è un nuovo load di entries
-def system_loaded(entry, entries):
-  # WARN: tutti i publish|subscribe|riferimenti a topic NON sono ancora stati riscritti in riferimenti assoluti (sono ancora logici)
-  
-  entry.system.entry_definition_add_default(entries[x], {
-    'publish': ...
-  });
+#def system_loaded(self_entry, entries):
+#  # WARN: tutti i publish|subscribe|riferimenti a topic NON sono ancora stati riscritti in riferimenti assoluti (sono ancora logici)
+#  
+#  self_entry.system.entry_definition_add_default(entries[x], {
+#    'publish': ...
+#  });
+#  pass
+
+# Chiamato durante il load di un entry, dopo l'instanziamento di entry ma prima della sua inizializzazione (è quindi possibile fare l'inject di proprietà/definition/config...)
+# WARN: In questa fase non tutte le proprietà dell'entry sono caricate o sono definitive (ad esempio entry.config esiste ma è la versione "iniziale", visto che definition potrebbe cambiare)
+# In generale ci sono le stesse restrizioni di load()
+def entry_load(self_entry, entry):
+  pass
+
+def entry_unload(self_entry, entry):
   pass
 
 # Usato se il modulo specifica definition.install_on, per "installarsi" su altri entry che hanno delle specifiche proprietà
-# @param installer_entry l'entry del modulo che vuole installare le nuove funzionalità (quello che ha "install_on")
+# @param self_entry l'entry del modulo che vuole installare le nuove funzionalità (quello che ha "install_on")
 # @param entry l'entry destinazione, alla quale vanno aggiunte le funzionalità
 # @param conf la configurazione estratta dalle property dell'entry, in base alle condizioni specificate in "install_on"
-def entry_install(installer_entry, entry, conf):
+def entry_install(self_entry, entry, conf):
   required = entry.definition['required'] if 'required' in entry.definition else []
-  required.append(installer_entry.id)
+  required.append(self_entry.id)
   # Aggiunge delle definizioni
   system.entry_definition_add_default(entry, {
     'required': required,
@@ -353,20 +362,27 @@ def entry_install(installer_entry, entry, conf):
   # Aggiunge un handler "init" specifico (può aggiungere solo da "init" in poi, dal momento che load, system_loaded... sono già stati chiamati
   entry.handlers_add('init', 'toggle', entry_init)
 
+def entry_uninstall(self_entry, entry, conf):
+  pass
+
 # Inizializzazione: avviata alla creazione del modulo
-# Da notare che il broker è ancora sconnesso, ma si possono comunque fare dei publish (che verranno effettuati alla connessione)
-def init(entry):
-  logging.debug('#{id}> debug...'.format(id = entry.id))
+# Da notare che il broker potrebbe essere ancora sconnesso (se siamo in fase di boot del nodo), ma si possono comunque fare dei publish (che verranno effettuati alla connessione)
+def init(self_entry):
+  logging.debug('#{id}> debug...'.format(id = self_entry.id))
   
   print(_("Plugin init"))
   print(_("prova %s %s") % ("Plugin", "123"))
 
-def system_initialized(entry, entries, modules, devices, items):
+
+# Chiamato quando un entry viene inizializzato (dopo entry_load e entry_install)
+def entry_init(self_entry, entry):
   pass
 
-# Chiamato quando viene chiuso il nodo
-def destroy(entry):
+# Chiamato quando viene fatto l'unload dell'entry (alla chiusura del nodo, oppure se l'entry viene eliminato o ricaricato)
+def destroy(self_entry):
   pass
+
+# ------------------
 
 # Esempio di callback di subscriptions
 def on_subscribed_message(entry, subscribed_message):
@@ -400,10 +416,9 @@ def publish(entry, realtopic, metadata):
   entry.publish('', {})
   pass
 
-# Chiamato ogni volta che i metadata di sistema sono cambiati (quindi all'init del nodo, se la configurazione viene ricaricata, se entra un nuovo nodo nel sistema o se esce)
-def system_metadata_change(entry):
+# Chiamato ogni volta che gli entries vengono cambiati (quindi all'init del nodo, se la configurazione viene ricaricata, se entra un nuovo nodo nel sistema o se esce)
+def system_entries_change(entry, entry_ids_loaded, entry_ids_unloaded):
   pass
-
 
 # Esempio di uso thread interno:
 def init(entry):

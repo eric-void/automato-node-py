@@ -36,8 +36,9 @@ def init(_storage_fetch_data = True):
   threads = {}
   
   system.on_entry_load(_on_system_entry_load)
-  system.on_loaded(_on_system_entries_loaded)
-  system.on_initialized(_on_system_entries_init)
+  system.on_entry_init(_on_system_entry_init)
+  system.on_entry_unload(_on_system_entry_unload)
+  system.on_entries_change(_on_system_entries_change)
   system.on_message(_on_system_message)
   system.init(_on_system_initialized)
   while not _system_initialized:
@@ -53,8 +54,6 @@ def destroy():
     if threads[t] and threads[t].is_alive():
       threads[t].join()
 
-  entries_invoke('destroy')
-  
   clone_entry_names = list(system.entries().keys()) # I make a clone of entry names, because some handler could change "entries"
   for entry_id in clone_entry_names:
     entry = system.entry_get(entry_id)
@@ -67,11 +66,13 @@ def destroy():
   
 #def system():
 #  return system
-  
+
+system_entries_to_reload = []
+
 def _on_system_entry_load(entry):
-  global storage_fetch_data, node_name
+  global storage_fetch_data, node_name, system_entries_to_reload
   
-  entry.is_local = entry.node_name == node_name
+  #entry.is_local = entry.node_name == node_name
   # TODO data e timers possono essere usati anche su nodi remoti (lo fanno i moduli che aggiungono logiche, come health, ma è da verificare)
   entry.data = {}
   entry.data_lock = threading.Lock()
@@ -101,22 +102,102 @@ def _on_system_entry_load(entry):
     if storage_fetch_data:
       storage.retrieveData(entry)
     
-    # Caricamento completo definition
-    # Deve essere dopo "storage" (cosi' il load può usare entry.data)
+    # calls load hook
+    # MUST be after storage init (entry.data must be available in next calls)
     if entry.type == 'module' and hasattr(entry.module, 'load'):
       loaded_definition = entry.module.load(entry)
       if loaded_definition:
         entry.definition = utils.dict_merge(entry.definition, loaded_definition)
-
-def _on_system_entries_loaded(entries, initial = False):
-  entries_invoke('system_loaded', entries)
-  for e in entries:
-    if entries[e].is_local and 'install_on' in entries[e].definition:
-      for e1 in entries:
-        conf = _entry_install_on_conf(entries[e], entries[e].definition['install_on'], entries[e1])
+    
+    # calls entry_load hook on other entries
+    entries_invoke('entry_load', entry)
+    
+    # if other entries must be installed on this entry, calls them
+    for installer_entry_id, installer_entry in system.entries().items():
+      if installer_entry.is_local and 'install_on' in installer_entry.definition:
+        conf = _entry_install_on_conf(installer_entry, installer_entry.definition['install_on'], entry)
         if conf:
-          entry_invoke(entries[e], 'entry_install', entries[e1], conf)
+          entry_invoke(installer_entry, 'entry_install', entry, conf)
 
+    # if this entry define an "entry_load" hook, all previous entries should be reloaded
+    if entry.type == 'module' and hasattr(entry.module, 'entry_load'):
+      for eid in system.entries().keys():
+        if eid != entry.id and not (eid in system_entries_to_reload):
+          system_entries_to_reload.append(eid)
+    else:
+      # if this entry define an "entry_install" hook, all previous entries matching install rules should be reloaded
+      if entry.type == 'module' and hasattr(entry.module, 'entry_install'):
+        for eid, eentry in system.entries().items():
+          if eid != entry.id and not (eid in system_entries_to_reload):
+            conf = _entry_install_on_conf(entry, entry.definition['install_on'], eentry)
+            if conf:
+              system_entries_to_reload.append(eid)
+
+def _on_system_entry_init(entry):
+  if entry.is_local:
+    entry.subscription_handlers = {}
+
+    for topic_rule in entry.definition['publish']:
+      if 'run_on' in entry.definition['publish'][topic_rule]:
+        for eventref in entry.definition['publish'][topic_rule]['run_on']:
+          system.on_event(eventref, _on_run_on_event_lambda(entry, topic_rule), entry, 'run_on')
+
+    for topic_rule in entry.definition['subscribe']:
+      if 'handler' in entry.definition['subscribe'][topic_rule] or 'publish' in entry.definition['subscribe'][topic_rule]:
+        if not topic_rule in entry.subscription_handlers:
+          entry.subscription_handlers[topic_rule] = []
+        if 'handler' in entry.definition['subscribe'][topic_rule]:
+          handler = get_handler(entry, entry.definition['subscribe'][topic_rule]['handler'])
+          if handler:
+            entry.subscription_handlers[topic_rule].append([handler, entry])
+        if 'publish' in entry.definition['subscribe'][topic_rule]:
+          for p in entry.definition['subscribe'][topic_rule]['publish']:
+            entry.subscription_handlers[topic_rule].append([_on_mqtt_subscribed_message_publish_lambda(entry, entry.topic(p)), entry])
+    
+    for eventref in entry.definition['on']:
+      if 'handler' in entry.definition['on'][eventref]:
+        system.on_event(eventref, entry.definition['on'][eventref]['handler'], entry, 'on')
+      if 'do' in entry.definition['on'][eventref]:
+        if isinstance(entry.definition['on'][eventref]['do'], str):
+          system.on_event(eventref, _do_action_on_event_lambda(entry.definition['on'][eventref]['do'], if_event_not_match = entry.definition['on'][eventref]['do_if_event_not_match'] if 'do_if_event_not_match' in entry.definition['on'][eventref] else False), entry, 'on')
+        else:
+          for actionref in entry.definition['on'][eventref]['do']:
+            system.on_event(eventref, _do_action_on_event_lambda(actionref, if_event_not_match = entry.definition['on'][eventref]['do_if_event_not_match'] if 'do_if_event_not_match' in entry.definition['on'][eventref] else False), entry, 'on')
+    
+    entry_invoke(entry, 'init')
+    entries_invoke('entry_init', entry)
+    
+    # if this entry define an "entry_init" hook, all previous entries should be passed to it
+    if entry.type == 'module' and hasattr(entry.module, 'entry_init'):
+      for eid, eentry in system.entries().items():
+        if eid != entry.id:
+          entry.module.entry_init(entry, eentry)
+
+def _on_system_entry_unload(entry):
+  if entry.is_local:
+    entry.store_data()
+    storage.entry_uninstall(storage, entry)
+    entries_invoke('entry_unload', entry);
+  
+    for installer_entry_id, installer_entry in system.entries().items():
+      if installer_entry.is_local and 'install_on' in installer_entry.definition:
+        conf = _entry_install_on_conf(installer_entry, installer_entry.definition['install_on'], entry)
+        if conf:
+          entry_invoke(installer_entry, 'entry_uninstall', entry, conf)
+    
+    # if this entry define an "entry_unload" hook, all previous entries should be passed to it
+    if entry.type == 'module' and hasattr(entry.module, 'entry_unload'):
+      for eid, eentry in system.entries().items():
+        entry.module.entry_unload(entry, eentry)
+    # if this entry define an "entry_uninstall" hook, all previous entries matching install rules should be passed to it
+    if entry.type == 'module' and hasattr(entry.module, 'entry_uninstall'):
+      for eid, eentry in system.entries().items():
+        conf = _entry_install_on_conf(entry, entry.definition['install_on'], eentry)
+        if conf:
+          entry.module.entry_uninstall(entry, eentry, conf)
+    
+    entry_invoke(entry, 'destroy')
+  
 def _entry_install_on_conf(installer_entry, installer_conditions, entry):
   conf = {}
   for key in installer_conditions:
@@ -142,45 +223,15 @@ def _entry_install_on_match(val, match):
     return False
   return val == match
 
-def _on_system_entries_init(entries):
-  for e in entries:
-    if entries[e].is_local:
-      entry_invoke(entries[e], 'init')
-
-  for e in entries:
-    if entries[e].is_local:
-      entry = entries[e]
-      entry.subscription_handlers = {}
-
-      for topic_rule in entry.definition['publish']:
-        if 'run_on' in entry.definition['publish'][topic_rule]:
-          for eventref in entry.definition['publish'][topic_rule]['run_on']:
-            system.on_event(eventref, _on_run_on_event_lambda(entry, topic_rule), entry, 'run_on')
-
-      for topic_rule in entry.definition['subscribe']:
-        if 'handler' in entry.definition['subscribe'][topic_rule] or 'publish' in entry.definition['subscribe'][topic_rule]:
-          if not topic_rule in entry.subscription_handlers:
-            entry.subscription_handlers[topic_rule] = []
-          if 'handler' in entry.definition['subscribe'][topic_rule]:
-            handler = get_handler(entry, entry.definition['subscribe'][topic_rule]['handler'])
-            if handler:
-              entry.subscription_handlers[topic_rule].append([handler, entry])
-          if 'publish' in entry.definition['subscribe'][topic_rule]:
-            for p in entry.definition['subscribe'][topic_rule]['publish']:
-              entry.subscription_handlers[topic_rule].append([_on_mqtt_subscribed_message_publish_lambda(entry, entry.topic(p)), entry])
-      
-      for eventref in entry.definition['on']:
-        if 'handler' in entry.definition['on'][eventref]:
-          system.on_event(eventref, entry.definition['on'][eventref]['handler'], entry, 'on')
-        if 'do' in entry.definition['on'][eventref]:
-          if isinstance(entry.definition['on'][eventref]['do'], str):
-            system.on_event(eventref, _do_action_on_event_lambda(entry.definition['on'][eventref]['do'], if_event_not_match = entry.definition['on'][eventref]['do_if_event_not_match'] if 'do_if_event_not_match' in entry.definition['on'][eventref] else False), entry, 'on')
-          else:
-            for actionref in entry.definition['on'][eventref]['do']:
-              system.on_event(eventref, _do_action_on_event_lambda(actionref, if_event_not_match = entry.definition['on'][eventref]['do_if_event_not_match'] if 'do_if_event_not_match' in entry.definition['on'][eventref] else False), entry, 'on')
-
-  entries_invoke('system_initialized', entries)
-  entries_invoke_threaded('system_metadata_change')  
+def _on_system_entries_change(entry_ids_loaded, entry_ids_unloaded):
+  global system_entries_to_reload
+  while system_entries_to_reload:
+    logging.warn("NODE_SYSTEM> And entry just loaded need to install over previous entries, reloading them: {e}".format(e = system_entries_to_reload))
+    system_entries_to_reload2 = system_entries_to_reload
+    system_entries_to_reload = []
+    for entry_id in system_entries_to_reload2:
+      system.entry_reload(entry_id, call_on_entries_change = False)
+  entries_invoke_threaded('system_entries_change', entry_ids_loaded, entry_ids_unloaded)
 
 def _on_system_message(message):
   for sm in message.subscribedMessages():
@@ -270,10 +321,10 @@ def _on_mqtt_subscribed_message_publish_lambda(_entry, _topic):
   return lambda entry, subscribed_message: _entry.run_publish(_topic)
 
 def _on_run_on_event_lambda(_entry, _topic):
-  return lambda entry, eventname, eventdata: _entry.run_publish(_topic)
+  return lambda entry, eventname, eventdata, caller, published_message: _entry.run_publish(_topic)
 
 def _do_action_on_event_lambda(actionref, if_event_not_match = False):
-  return lambda entry, eventname, eventdata: system.do_action(actionref, eventdata['params'], if_event_not_match = if_event_not_match)
+  return lambda entry, eventname, eventdata, caller, published_message: system.do_action(actionref, eventdata['params'], if_event_not_match = if_event_not_match)
 
 
 

@@ -54,7 +54,7 @@ def init(entry):
     
     entry.updater.start_polling()
 
-def system_metadata_change(entry):
+def system_entries_change(entry, entry_ids_loaded, entry_ids_unloaded):
   global commands, topics_help
   
   commands = {}

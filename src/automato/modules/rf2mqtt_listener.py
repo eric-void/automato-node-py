@@ -20,19 +20,29 @@ entry = {
 }
 """
 
-def system_loaded(installer_entry, entries):
-  if not hasattr(installer_entry, 'rf_codes'):
-    installer_entry.rf_codes = {}
-  for entry_id in entries:
-    if "rf_code" in entries[entry_id].definition:
-      entry_install(installer_entry, entries[entry_id], entries[entry_id].definition['rf_code'])
+def load(self_entry):
+  if not hasattr(self_entry, 'rf_codes'):
+    self_entry.rf_codes = {}
 
-def entry_install(installer_entry, entry, rf_code):
+def entry_load(self_entry, entry):
+  if "rf_code" in entry.definition:
+    entry_install(self_entry, entry, entry.definition['rf_code'])
+
+def entry_unload(self_entry, entry):
+  if "rf_code" in entry.definition:
+    rf_code = entry.definition['rf_code']
+    if isinstance(rf_code, dict):
+      for c in rf_code:
+        del self_entry.rf_codes[c]
+    else:
+      del self_entry.rf_codes[rf_code]
+
+def entry_install(self_entry, entry, rf_code):
   if isinstance(rf_code, dict):
     for c in rf_code:
-      installer_entry.rf_codes[c] = (entry.id, rf_code[c])
+      self_entry.rf_codes[c] = (entry.id, rf_code[c])
   else:
-    installer_entry.rf_codes[rf_code] = (entry.id, '')
+    self_entry.rf_codes[rf_code] = (entry.id, '')
   required = entry.definition['required'] if 'required' in entry.definition else []
   required.append('rf2mqtt_listener')
   system.entry_definition_add_default(entry, {
@@ -53,16 +63,16 @@ def entry_install(installer_entry, entry, rf_code):
     },
   })
   
-def rf_rx_callback(installer_entry, rfdevice):
-  for rf_code in installer_entry.rf_codes:
+def rf_rx_callback(self_entry, rfdevice):
+  for rf_code in self_entry.rf_codes:
     if str(rfdevice['rx_code']) == str(rf_code):
-      entry_id, port = installer_entry.rf_codes[rf_code]
-      logging.debug("#{id}> found matching code: {rx_code} for {entry_id}/{port} [pulselength {rx_pulselength}, protocol {rx_proto}]".format(id = installer_entry.id, entry_id = entry_id, port = port if port != '' else '-', rx_code = str(rfdevice['rx_code']), rx_pulselength = str(rfdevice['rx_pulselength']), rx_proto = str(rfdevice['rx_proto'])))
+      entry_id, port = self_entry.rf_codes[rf_code]
+      logging.debug("#{id}> found matching code: {rx_code} for {entry_id}/{port} [pulselength {rx_pulselength}, protocol {rx_proto}]".format(id = self_entry.id, entry_id = entry_id, port = port if port != '' else '-', rx_code = str(rfdevice['rx_code']), rx_pulselength = str(rfdevice['rx_pulselength']), rx_proto = str(rfdevice['rx_proto'])))
       entry = system.entry_get(entry_id)
       if entry:
         entry.publish('@/detected', port)
       else:
-        logging.error('#{id}> entry {entry_id} not found for rf_code {rf_code}'.format(id = installer_entry.id, entry_id = entry_id, rf_code = rf_code))
+        logging.error('#{id}> entry {entry_id} not found for rf_code {rf_code}'.format(id = self_entry.id, entry_id = entry_id, rf_code = rf_code))
 
 def on_rf2mqtt_message(entry, subscribed_message):
   rf_rx_callback(entry, subscribed_message.payload)
