@@ -59,10 +59,10 @@ def run(entry):
             t = ''
           entry.history_event_buffer[entry_id][eventname][k] = []
     
-    if len(lines):
-      lines.sort()
-      with open(filepath, 'a') as the_file:
-        for l in lines:
-          the_file.write(l + '\n')
+      if len(lines):
+        lines.sort()
+        with open(filepath, 'a') as the_file:
+          for l in lines:
+            the_file.write(l + '\n')
 
   entry.history_last_file_suffix = file_suffix
