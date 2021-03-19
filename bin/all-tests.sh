@@ -1,5 +1,6 @@
 echo "----------------------------------------------------------------------------------------------------------------------------------------------------------------"
 automato-node-py/bin/automato-node.sh -c test-config.json --test  system_test
+automato-node-py/bin/automato-node.sh -c test-config.json --test  node_system_test
 automato-node-py/bin/automato-node.sh -c test-config.json --test  health_test
 automato-node-py/bin/automato-node.sh -c test-config.json --test  scheduler_test
 automato-node-py/bin/automato-node.sh -c test-config.json --test  toggle_test

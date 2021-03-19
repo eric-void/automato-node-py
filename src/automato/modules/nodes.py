@@ -94,7 +94,8 @@ def on_metadata(entry, subscribed_message):
         for entry_id in payload_entries:
           if entry_id.endswith('@' + node):
             node_entries[entry_id] = payload_entries[entry_id]
-        system.entry_load_definitions(node_entries, node_name = node, unload_other_from_node = True, id_from_definition = False)
+        #system.entry_load_definitions(node_entries, node_name = node, unload_other_from_node = True, id_from_definition = False)
+        system.entry_load(node_entries, node_name = node, unload_other_from_node = True, id_from_definition = False)
     
     if todo:
       publish_metadata(entry, entry.topic('./metadata'))

@@ -67,10 +67,11 @@ def destroy():
 #def system():
 #  return system
 
-system_entries_to_reload = []
+#system_entries_to_reload = []
 
+"""
 def _on_system_entry_load(entry):
-  global storage_fetch_data, node_name, system_entries_to_reload
+  global storage_fetch_data, node_name#, system_entries_to_reload
   
   #entry.is_local = entry.node_name == node_name
   # TODO data e timers possono essere usati anche su nodi remoti (lo fanno i moduli che aggiungono logiche, come health, ma è da verificare)
@@ -93,7 +94,7 @@ def _on_system_entry_load(entry):
         try:
           entry.module = importlib.import_module(name.replace("/", "."))
         except ModuleNotFoundError:
-          logging.error("module not found: %s" % (name))
+          logging.warning("module not found: %s" % (name))
       
       if entry.module and hasattr(entry.module, 'definition'):
         entry.definition = utils.dict_merge(entry.module.definition, entry.definition)
@@ -119,19 +120,117 @@ def _on_system_entry_load(entry):
         if conf:
           entry_invoke(installer_entry, 'entry_install', entry, conf)
 
+    system_entries_to_reload = []
+
     # if this entry define an "entry_load" hook, all previous entries should be reloaded
-    if entry.type == 'module' and hasattr(entry.module, 'entry_load'):
+    if entry.type == 'module' and has_handler(entry, 'entry_load'):
       for eid in system.entries().keys():
         if eid != entry.id and not (eid in system_entries_to_reload):
           system_entries_to_reload.append(eid)
     else:
       # if this entry define an "entry_install" hook, all previous entries matching install rules should be reloaded
-      if entry.type == 'module' and hasattr(entry.module, 'entry_install'):
+      if entry.type == 'module' and has_handler(entry, 'entry_install'):
         for eid, eentry in system.entries().items():
           if eid != entry.id and not (eid in system_entries_to_reload):
             conf = _entry_install_on_conf(entry, entry.definition['install_on'], eentry)
             if conf:
               system_entries_to_reload.append(eid)
+
+    return system_entries_to_reload
+"""
+
+def _on_system_entry_load(loading_defs):
+  # @see system.on_entry_load for docs
+  
+  global storage_fetch_data, node_name
+  
+  for entry_id, entry in loading_defs.items():
+    #entry.is_local = entry.node_name == node_name
+    # TODO data e timers possono essere usati anche su nodi remoti (lo fanno i moduli che aggiungono logiche, come health, ma è da verificare)
+    entry.data = {}
+    entry.data_lock = threading.Lock()
+    entry.timers = {}
+    if entry.is_local:
+      entry.request = threading.local()
+      entry.run_publish = run_publish_lambda(entry)
+      entry.methods = {}
+      entry.handlers = {}
+      entry.handlers_add = entry_handlers_add_lambda(entry)
+
+      if entry.type == 'module':
+        entry.module = None
+        name = entry.definition['module']
+        try:
+          entry.module = importlib.import_module("automato.modules." + name.replace("/", "."))
+        except ModuleNotFoundError:
+          try:
+            entry.module = importlib.import_module(name.replace("/", "."))
+          except ModuleNotFoundError:
+            logging.warning("module not found: %s" % (name))
+        
+        if entry.module and hasattr(entry.module, 'definition'):
+          entry.definition = utils.dict_merge(entry.module.definition, entry.definition)
+
+      storage.entry_install(storage, entry)
+      if storage_fetch_data:
+        storage.retrieveData(entry)
+    
+      # calls load hook
+      # MUST be after storage init (entry.data must be available in next calls)
+      if entry.type == 'module' and hasattr(entry.module, 'load'):
+        loaded_definition = entry.module.load(entry)
+        if loaded_definition:
+          entry.definition = utils.dict_merge(entry.definition, loaded_definition)
+
+      entry._refresh_definition_based_properties()
+    
+  previously_loaded_entries_to_reload = []
+
+  for entry in loading_defs.values():
+    # if this entry define an "entry_load" hook, all running entries should be reloaded
+    if entry.type == 'module' and has_handler(entry, 'entry_load'):
+      for other_entry in system.entries().values():
+        if other_entry.loaded and other_entry.id not in previously_loaded_entries_to_reload:
+          previously_loaded_entries_to_reload.append(other_entry.id)
+    else:
+      # if this entry define an "entry_install" hook, all running entries matching install rules should be reloaded
+      if entry.type == 'module' and 'install_on' in entry.definition:
+        for other_entry in system.entries().values():
+          if other_entry.loaded and other_entry.id not in previously_loaded_entries_to_reload:
+            conf = _entry_install_on_conf(entry, entry.definition['install_on'], other_entry)
+            if conf:
+              previously_loaded_entries_to_reload.append(other_entry.id)
+  
+  for entry in loading_defs.values():
+    # entry_load: calls previously_loaded.entry_load(entry). I consider loaded in the past and initialized, and loading now, but already called by this callback
+    for previously_loaded_entry in system.entries().values():
+      if previously_loaded_entry.is_local and previously_loaded_entry.id not in loading_defs and previously_loaded_entry.id not in previously_loaded_entries_to_reload:
+        entry_invoke(previously_loaded_entry, 'entry_load', entry)
+        
+    # entry_load on currently loading entries: calls entry.entry_load(other_entry). I consider all entries loading now, even if already processed by this callback. I don't consider loaded and initialized entries (they are in previously_loaded_entries_to_reload)
+    if entry.type == 'module' and has_handler(entry, 'entry_load'):
+      for other_entry in system.entries().values():
+        if not other_entry.loaded and other_entry.id != entry.id:
+          entry_invoke(entry, 'entry_load', other_entry)
+
+  for entry in loading_defs.values():
+    # entry_install: calls previously_loaded.entry_install(entry). I consider loaded in the past and initialized, and loading now, but already called by this callback
+    for previously_loaded_entry in system.entries().values():
+      if previously_loaded_entry.is_local and previously_loaded_entry.id not in loading_defs and previously_loaded_entry.id not in previously_loaded_entries_to_reload:
+        if 'install_on' in previously_loaded_entry.definition:
+          conf = _entry_install_on_conf(previously_loaded_entry, previously_loaded_entry.definition['install_on'], entry)
+          if conf:
+            entry_invoke(previously_loaded_entry, 'entry_install', entry, conf)
+    
+    # entry_install on currently loading entries: calls entry.entry_install(other_entry) I consider all entries loading now, even if already processed by this callback. I don't consider loaded and initialized entries (they are in previously_loaded_entries_to_reload)
+    if entry.type == 'module' and 'install_on' in entry.definition:
+      for other_entry in system.entries().values():
+        if not other_entry.loaded and other_entry.id != entry.id:
+          conf = _entry_install_on_conf(entry, entry.definition['install_on'], other_entry)
+          if conf:
+            entry_invoke(entry, 'entry_install', other_entry, conf)
+
+  return previously_loaded_entries_to_reload
 
 def _on_system_entry_init(entry):
   if entry.is_local:
@@ -224,13 +323,19 @@ def _entry_install_on_match(val, match):
   return val == match
 
 def _on_system_entries_change(entry_ids_loaded, entry_ids_unloaded):
+  """
   global system_entries_to_reload
-  while system_entries_to_reload:
-    logging.warn("NODE_SYSTEM> And entry just loaded need to install over previous entries, reloading them: {e}".format(e = system_entries_to_reload))
+  antiflood = 5
+  while system_entries_to_reload and antiflood > 0:
+    logging.warn("NODE_SYSTEM> An entry just loaded need to install over previous entries, reloading them: {e}".format(e = system_entries_to_reload))
     system_entries_to_reload2 = system_entries_to_reload
     system_entries_to_reload = []
     for entry_id in system_entries_to_reload2:
       system.entry_reload(entry_id, call_on_entries_change = False)
+    antiflood = antiflood - 1
+    if antiflood == 0:
+      logging.error("ANTIFLOOD!")
+  """
   entries_invoke_threaded('system_entries_change', entry_ids_loaded, entry_ids_unloaded)
 
 def _on_system_message(message):
@@ -337,6 +442,21 @@ def _do_action_on_event_lambda(actionref, if_event_not_match = False):
 #
 ###############################################################################################################################################################
 
+def has_handler(entry, method):
+  if not isinstance(method, str):
+    return True
+  
+  if not entry.is_local:
+    return False
+
+  if entry.type == 'module' and hasattr(entry.module, method):
+    return True
+  if method in entry.methods:
+    return True
+  if method in entry.handlers and len(entry.handlers[method]):
+    return True
+  return False
+
 def get_handler(entry, method):
   if not isinstance(method, str):
     return method
@@ -349,7 +469,7 @@ def get_handler(entry, method):
     handlers.append(getattr(entry.module, method))
   if method in entry.methods:
     handlers.append(entry.methods[method])
-  if method in entry.handlers and len(entry.handlers):
+  if method in entry.handlers and len(entry.handlers[method]):
     handlers += list(entry.handlers[method].values())
     
   if not handlers:
@@ -380,7 +500,7 @@ def entry_invoke(entry, method, *args, **kwargs):
     entry_str = entry
     entry = system.entry_get(entry_str)
     if not entry:
-      logging.error("#system> skipped invocation of {method}: entry {entry} not found!".format(entry=entry_str, method=method))
+      logging.error("#NODE_SYSTEM> skipped invocation of {method}: entry {entry} not found!".format(entry=entry_str, method=method))
       return False
   
   func = get_handler(entry, method)
@@ -398,7 +518,7 @@ def entry_invoke_delayed(entry, timer_key, delay, method, *args, _pass_entry = T
     entry_str = entry
     entry = system.entry_get(entry_str)
     if not entry:
-      logging.error("#system> skipped invocation of {method} (delayed): entry {entry} not found!".format(entry=entry_str, method=method))
+      logging.error("#NODE_SYSTEM> skipped invocation of {method} (delayed): entry {entry} not found!".format(entry=entry_str, method=method))
       return False
   func = get_handler(entry, method)
   if func:
@@ -449,7 +569,7 @@ def entry_invoke_threaded(entry, method, *args, **kwargs):
     entry_str = entry
     entry = system.entry_get(entry_str)
     if not entry:
-      logging.error("#system> skipped invocation of {method}: entry {entry} not found!".format(entry=entry_str, method=method))
+      logging.error("#NODE_SYSTEM> skipped invocation of {method}: entry {entry} not found!".format(entry=entry_str, method=method))
       return False
     
   func = get_handler(entry, method)
