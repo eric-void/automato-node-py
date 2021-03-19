@@ -9,6 +9,7 @@ from threading import Timer
 
 from automato.core import system
 from automato.core import utils
+from automato.core import test
 
 from automato.node import node_system as node
 
@@ -24,6 +25,7 @@ def scripting_globals(entry, _globals):
     # LIBS
     'utils': utils,
     'logging': logging,
+    'test': test,
     
     # ENTITIES
     'entry': entry,
