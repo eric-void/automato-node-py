@@ -99,9 +99,9 @@ def entry_load(self_entry, entry):
             'failure': "js:('value' in payload && payload['value'] in {'alive':0, 'failure':0, 'idle':0} ? { value: payload['value'] == 'failure', reason: payload['value'] == 'failure' && 'reason' in payload ? payload['reason'] : ''} : null)",
             'clock': "js:({ value: payload['time'] })"
           },
-          "events_listen": [".connected", ".alive", ".failure"]
         },
-      }
+      },
+      "events_listen": [".connected", ".alive", ".failure"]
     });
 
     if system.entry_support_event(entry, 'connected'):
