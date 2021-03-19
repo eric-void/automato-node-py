@@ -320,6 +320,7 @@ SYSTEM_HANDLER_ORDER_handlername = -10
 # Viene chiamato PRIMA di init
 # WARN: NON è possibile usare i metodi entry.*() [publish|notify] a questo livello, è possibile farlo solo da init(entry) in poi
 # Può invece usare .data
+# In generale la definizione di self_entry è in caricamento, può ancora essere modificata, e quindi mancano diverse normalizzazioni ed espansioni (ad esempio dei topic di publish / subscribe)
 def load(self_entry):
   # Se si vogliono prendere i metadati definiti da configurazione guardare su entry.definition (questi verrano poi uniti al risultato di questa chiamata)
   # self_entry.config ancora non è initializzato, usare self_entry.definition['config']
@@ -340,14 +341,19 @@ def load(self_entry):
 
 # Chiamato durante il load di un entry, dopo l'instanziamento di entry ma prima della sua inizializzazione (è quindi possibile fare l'inject di proprietà/definition/config...)
 # WARN: In questa fase non tutte le proprietà dell'entry sono caricate o sono definitive (ad esempio entry.config esiste ma è la versione "iniziale", visto che definition potrebbe cambiare)
+# IMPORTANTE: Questo metodo potrebbe essere chiamato mentre lo stesso self_entry è in loading, e dove quindi init() non è ancora stato chiamato. Occorre usare strutture che sono state inizializzate da self_entry.load()
 # In generale ci sono le stesse restrizioni di load()
 def entry_load(self_entry, entry):
   pass
 
 def entry_unload(self_entry, entry):
+  # Deve effettuare la pulizia di eventuale ambiente inizializzato in entry_load
+  # Da notare che eventuali event_listener inizializzati in entry_load, se correttamente passato il reference_entry, non è necessario pulirli
   pass
 
 # Usato se il modulo specifica definition.install_on, per "installarsi" su altri entry che hanno delle specifiche proprietà
+# WARN + IMPORTANTE:  tutto quanto scritto per entry_load
+#
 # @param self_entry l'entry del modulo che vuole installare le nuove funzionalità (quello che ha "install_on")
 # @param entry l'entry destinazione, alla quale vanno aggiunte le funzionalità
 # @param conf la configurazione estratta dalle property dell'entry, in base alle condizioni specificate in "install_on"
@@ -363,6 +369,8 @@ def entry_install(self_entry, entry, conf):
   entry.handlers_add('init', 'toggle', entry_init)
 
 def entry_uninstall(self_entry, entry, conf):
+  # Deve effettuare la pulizia di eventuale ambiente inizializzato in entry_load
+  # Da notare che eventuali event_listener inizializzati in entry_load, se correttamente passato il reference_entry, non è necessario pulirli
   pass
 
 # Inizializzazione: avviata alla creazione del modulo
