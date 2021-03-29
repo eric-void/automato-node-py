@@ -35,7 +35,9 @@ def test_init():
           "@/check": {
             "type": None,
             "check_interval": "60",
-          }
+          },
+
+          '@/#': {} # catchall rule
         },
         "subscribe": {
           "@/sub1": { "response": [ "@/sub1-res" ] },
@@ -57,7 +59,7 @@ def test_init():
             "type": None,
           }
         }
-      }
+      },
     ],
   })
 
@@ -67,7 +69,6 @@ def test_run(entries):
   test.waitPublish("device/test-device/check", "") # sending @/check topic to avoid the "check_interval" failure
   
   if True:
-    
     # Test device really offline (more than 1seconds) and health of device and item (that requires the device)
     test.assertPublish("dead", "device/test-device/lwt", "offline", assertSubscribeSomePayload = { 
       'device/test-device/health': { 'value': 'dead', 'reason': 'disconnected for too long', 'time': ('d', system.time() + 1, 2) },
@@ -98,10 +99,13 @@ def test_run(entries):
     })
   
   if True:
-    test.assertPublish("no-response", "device/test-device/sub1", "", assertSubscribeSomePayload = { 
+    test.assertPublish("no-response1", "device/test-device/sub1", "", assertSubscribeSomePayload = { 
       'device/test-device/health': { 'value': 'failure', 'reason': ('re', '.*device/test-device/sub1.*'), 'time': ('d', system.time(), 6) },
       'item/test-item/health': { 'value': 'failure', 'reason': ('re', '.*test-device.*failure.*'), 'time': ('d', system.time(), 6) },
     }, timeoutms = 7000)
+    
+    # I repeat the "no-response" test to be sure the @/# catchall rulle wont invalidate results
+    test.assertPublish("no-response2", "device/test-device/sub1", "", assertSubscribeNotReceive = ['device/test-device/health', 'item/test-item/health'], timeoutms = 7000)
     
     test.waitPublish("device/test-device/sub1", "")
     test.assertPublish("correct-response", "device/test-device/sub1-res", "", assertSubscribeSomePayload = { 
