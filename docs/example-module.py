@@ -196,7 +196,8 @@ definition = {
       ... # Metadati specifici del tipo di modulo
     },
       
-    'topic_base/#': {}, # In questo modo si fa un "catch_all" di tutti i topic che sono associato a questo entry, ma non hanno una loro definizione (solo per sapere il publisher). Non avendo definizione (o avendo solo "topic", "description", o "notify*") il loro "topic_match_priority" è 0.
+    'topic_base/#': {}, # In questo modo si fa un "catchall" di tutti i topic che sono associato a questo entry, ma non hanno una loro definizione (solo per sapere il publisher). Non avendo definizione (o avendo solo "topic", "description", o "notify*") il loro "topic_match_priority" è 0.
+      # WARN: in caso di topic_match_priority = 0 (quindi in genere per un catchall) non verranno associati i topic che hanno un match anche con dei "subscribe": in quel caso il topic è considerato solo in subscribe, e NON in published
   },
   # [L.0]
   'subscribe': {
