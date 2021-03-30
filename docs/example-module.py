@@ -307,7 +307,15 @@ definition = {
     "entry_id.event",
     "*.event",
     ".event",
-  ]
+  ],
+  
+  # [L.2] via scripting module
+  "methods": {
+    "init": [ "print(entry.id)" ], # parametri: (entry, *args, **kwargs)
+    "start": [ "print(entry.id)" ], # parametri: (entry, *args, **kwargs)
+    "...": [ "print(args[0].id)" ], # parametri: (*args, **kwargs)
+  },
+
 }
 
 ##########################################################################################
