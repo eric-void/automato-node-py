@@ -36,7 +36,9 @@ def init(_storage_fetch_data = True):
   threads = {}
   
   system.on_entry_load(_on_system_entry_load)
+  system.on_entry_load_batch(_on_system_entry_load_batch)
   system.on_entry_init(_on_system_entry_init)
+  system.on_entry_init_batch(_on_system_entry_init_batch)
   system.on_entry_unload(_on_system_entry_unload)
   system.on_entries_change(_on_system_entries_change)
   system.on_message(_on_system_message)
@@ -63,18 +65,12 @@ def destroy():
   storage.destroy()
   system.destroy()
   _system_initialized = False
-  
-#def system():
-#  return system
 
-#system_entries_to_reload = []
-
-"""
 def _on_system_entry_load(entry):
-  global storage_fetch_data, node_name#, system_entries_to_reload
-  
+  global storage_fetch_data #, node_name
+
   #entry.is_local = entry.node_name == node_name
-  # TODO data e timers possono essere usati anche su nodi remoti (lo fanno i moduli che aggiungono logiche, come health, ma è da verificare)
+  # TODO data and timers can be used also by remote nodes (modules like "health" uses them, VERIFY THIS!)
   entry.data = {}
   entry.data_lock = threading.Lock()
   entry.timers = {}
@@ -102,88 +98,18 @@ def _on_system_entry_load(entry):
     storage.entry_install(storage, entry)
     if storage_fetch_data:
       storage.retrieveData(entry)
-    
+  
     # calls load hook
     # MUST be after storage init (entry.data must be available in next calls)
     if entry.type == 'module' and hasattr(entry.module, 'load'):
       loaded_definition = entry.module.load(entry)
       if loaded_definition:
         entry.definition = utils.dict_merge(entry.definition, loaded_definition)
-    
-    # calls entry_load hook on other entries
-    entries_invoke('entry_load', entry)
-    
-    # if other entries must be installed on this entry, calls them
-    for installer_entry_id, installer_entry in system.entries().items():
-      if installer_entry.is_local and 'install_on' in installer_entry.definition:
-        conf = _entry_install_on_conf(installer_entry, installer_entry.definition['install_on'], entry)
-        if conf:
-          entry_invoke(installer_entry, 'entry_install', entry, conf)
 
-    system_entries_to_reload = []
+    entry._refresh_definition_based_properties()
 
-    # if this entry define an "entry_load" hook, all previous entries should be reloaded
-    if entry.type == 'module' and has_handler(entry, 'entry_load'):
-      for eid in system.entries().keys():
-        if eid != entry.id and not (eid in system_entries_to_reload):
-          system_entries_to_reload.append(eid)
-    else:
-      # if this entry define an "entry_install" hook, all previous entries matching install rules should be reloaded
-      if entry.type == 'module' and has_handler(entry, 'entry_install'):
-        for eid, eentry in system.entries().items():
-          if eid != entry.id and not (eid in system_entries_to_reload):
-            conf = _entry_install_on_conf(entry, entry.definition['install_on'], eentry)
-            if conf:
-              system_entries_to_reload.append(eid)
-
-    return system_entries_to_reload
-"""
-
-def _on_system_entry_load(loading_defs):
-  # @see system.on_entry_load for docs
-  
-  global storage_fetch_data, node_name
-  
-  for entry_id, entry in loading_defs.items():
-    #entry.is_local = entry.node_name == node_name
-    # TODO data e timers possono essere usati anche su nodi remoti (lo fanno i moduli che aggiungono logiche, come health, ma è da verificare)
-    entry.data = {}
-    entry.data_lock = threading.Lock()
-    entry.timers = {}
-    if entry.is_local:
-      entry.request = threading.local()
-      entry.run_publish = run_publish_lambda(entry)
-      entry.methods = {}
-      entry.handlers = {}
-      entry.handlers_add = entry_handlers_add_lambda(entry)
-
-      if entry.type == 'module':
-        entry.module = None
-        name = entry.definition['module']
-        try:
-          entry.module = importlib.import_module("automato.modules." + name.replace("/", "."))
-        except ModuleNotFoundError:
-          try:
-            entry.module = importlib.import_module(name.replace("/", "."))
-          except ModuleNotFoundError:
-            logging.warning("module not found: %s" % (name))
-        
-        if entry.module and hasattr(entry.module, 'definition'):
-          entry.definition = utils.dict_merge(entry.module.definition, entry.definition)
-
-      storage.entry_install(storage, entry)
-      if storage_fetch_data:
-        storage.retrieveData(entry)
-    
-      # calls load hook
-      # MUST be after storage init (entry.data must be available in next calls)
-      if entry.type == 'module' and hasattr(entry.module, 'load'):
-        loaded_definition = entry.module.load(entry)
-        if loaded_definition:
-          entry.definition = utils.dict_merge(entry.definition, loaded_definition)
-
-      entry._refresh_definition_based_properties()
-    
+def _on_system_entry_load_batch(loading_defs):
+  # @see system.on_entry_load_batch for docs
   previously_loaded_entries_to_reload = []
 
   for entry in loading_defs.values():
@@ -264,10 +190,14 @@ def _on_system_entry_init(entry):
             system.on_event(eventref, _do_action_on_event_lambda(actionref, if_event_not_match = entry.definition['on'][eventref]['do_if_event_not_match'] if 'do_if_event_not_match' in entry.definition['on'][eventref] else False), entry, 'on')
     
     entry_invoke(entry, 'init')
-    entries_invoke('entry_init', entry)
+
+def _on_system_entry_init_batch(entries):
+  for entry in entries.values():
+    # calls *.entry_init(entry)
+    entries_invoke('entry_init', entry, _skip_entry_id = entry.id)
     
-    # if this entry define an "entry_init" hook, all previous entries should be passed to it
-    if entry.type == 'module' and hasattr(entry.module, 'entry_init'):
+    # calls entry.entry_init(*): if this entry define an "entry_init" hook, all previous entries should be passed to it
+    if entry.is_local and entry.type == 'module' and hasattr(entry.module, 'entry_init'):
       for eid, eentry in system.entries().items():
         if eid != entry.id:
           entry.module.entry_init(entry, eentry)
@@ -547,16 +477,17 @@ def cancel_entry_invoke_delayed(entry, timer_key):
     entry.timers[timer_key].cancel()
     del entry.timers[timer_key]
 
-def entries_invoke(method, *args, **kwargs):
+def entries_invoke(method, *args, _skip_entry_id = False, **kwargs):
   ret = None
   for entry_id, entry in system.entries().items():
-    func = get_handler(entry, method)
-    if func:
-      logging.debug("#{entry}> invoking {method} ...".format(entry = entry_id, method = method))
-      try:
-        ret = func(entry, *args, **kwargs)
-      except:
-        logging.exception("#{id}> exception in entries_invoke of method {method}".format(id = entry.id, method = method))
+    if not _skip_entry_id or entry_id != _skip_entry_id:
+      func = get_handler(entry, method)
+      if func:
+        logging.debug("#{entry}> invoking {method} ...".format(entry = entry_id, method = method))
+        try:
+          ret = func(entry, *args, **kwargs)
+        except:
+          logging.exception("#{id}> exception in entries_invoke of method {method}".format(id = entry.id, method = method))
   return ret
 
 # Parametri speciali: 
