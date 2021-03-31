@@ -143,7 +143,7 @@ def destroy(entry):
   entry.health_checker_thread.join()
 
 def entry_health_status(entry):
-  if not entry.is_local:
+  if not entry.is_local or not hasattr(entry, 'health_entry'):
     return None
   
   res = {'value': 'idle', 'reason': ''}
@@ -190,7 +190,7 @@ def publish_all_entries_status(entry, topic_rule, topic_definition):
   status = {}
   for entry_id in system.entries():
     oentry = system.entry_get(entry_id)
-    if oentry.is_local:
+    if oentry.is_local and entry_id != entry.id:
       status[entry_id] = entry_health_status(oentry)
       if status[entry_id]:
         status[entry_id]['changed'] = oentry.health_changed
