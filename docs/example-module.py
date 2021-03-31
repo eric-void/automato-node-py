@@ -352,6 +352,7 @@ def load(self_entry):
 # WARN: In questa fase non tutte le proprietà dell'entry sono caricate o sono definitive (ad esempio entry.config esiste ma è la versione "iniziale", visto che definition potrebbe cambiare)
 # IMPORTANTE: Questo metodo potrebbe essere chiamato mentre lo stesso self_entry è in loading, e dove quindi init() non è ancora stato chiamato. Occorre usare strutture che sono state inizializzate da self_entry.load()
 # In generale ci sono le stesse restrizioni di load()
+# WARN: Non viene chiamato per l'entry stesso che definisce il metodo (self_entry)
 def entry_load(self_entry, entry):
   pass
 
@@ -390,8 +391,8 @@ def init(self_entry):
   print(_("Plugin init"))
   print(_("prova %s %s") % ("Plugin", "123"))
 
-
 # Chiamato quando un entry viene inizializzato (dopo entry_load e entry_install)
+# WARN: Non viene chiamato per l'entry stesso che definisce il metodo (self_entry)
 def entry_init(self_entry, entry):
   pass
 
