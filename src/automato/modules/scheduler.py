@@ -18,6 +18,9 @@ definition = {
   'install_on': {
     '/^schedule.*/': ()
   },
+  'config': {
+    'scheduler_enabled': False, # E' solo il valore di default, impostato all'init del modulo se non ci sono dati in storage precedenti (o se i dati in storage sono corrotti)
+  },
   'jobs': [],
   'groups': {},
   
@@ -76,7 +79,7 @@ ON OTHER ENTRIES:
 
 def load(entry):
   if 'enabled' not in entry.data:
-    entry.data['enabled'] = True
+    entry.data['enabled'] = entry.definition['config']['scheduler_enabled']
     entry.data['timer_to'] = 0
   
   if 'groups' in entry.definition and entry.definition['groups']:
@@ -87,8 +90,8 @@ def load(entry):
           **job,
         })
         
-  entry.scheduler_oldjobs = entry.data['jobs'] if 'jobs' in entry.data else []
-  entry.scheduler_oldgroups = entry.data['groups'] if 'groups' in entry.data else []
+  entry.scheduler_oldjobs = entry.data['jobs'] if 'jobs' in entry.data else {}
+  entry.scheduler_oldgroups = entry.data['groups'] if 'groups' in entry.data else {}
   entry.data['jobs'] = {}
   entry.data['groups'] = {}
   

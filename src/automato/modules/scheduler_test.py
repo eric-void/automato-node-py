@@ -12,6 +12,9 @@ def test_init():
     "entries": [
       {
         "module": "scheduler",
+        "config": {
+          "scheduler_enabled": True,
+        },
         "jobs": [
           {"run_cron": "*/10 * * * *", "do": "item1.action(params['value']='1')"}
         ],
