@@ -110,8 +110,9 @@ def _on_system_entry_load(entry):
 
 def _on_system_entry_load_batch(loading_defs):
   # @see system.on_entry_load_batch for docs
+  
+  # reloading check
   previously_loaded_entries_to_reload = []
-
   for entry in loading_defs.values():
     # if this entry define an "entry_load" hook, all running entries should be reloaded
     if entry.type == 'module' and has_handler(entry, 'entry_load'):
@@ -128,19 +129,23 @@ def _on_system_entry_load_batch(loading_defs):
               previously_loaded_entries_to_reload.append(other_entry.id)
   
   for entry in loading_defs.values():
-    # entry_load: calls previously_loaded.entry_load(entry). I consider loaded in the past and initialized, and loading now, but already called by this callback
+    # entry_load: calls previously_loaded.entry_load(entry). I process loaded in the past and initialized entries, and loading now entries, but only already called by this callback
     for previously_loaded_entry in system.entries().values():
       if previously_loaded_entry.is_local and previously_loaded_entry.id not in loading_defs and previously_loaded_entry.id not in previously_loaded_entries_to_reload:
         entry_invoke(previously_loaded_entry, 'entry_load', entry)
         
-    # entry_load on currently loading entries: calls entry.entry_load(other_entry). I consider all entries loading now, even if already processed by this callback. I don't consider loaded and initialized entries (they are in previously_loaded_entries_to_reload)
+    # entry_load on currently loading entries and initialized ones: calls entry.entry_load(other_entry). I process all entries loading now, even if already processed by this callback. I consider loaded and initialized entries only if NOT in previously_loaded_entries_to_reload (they should be reloaded, it's useless to call methods on them).
     if entry.type == 'module' and has_handler(entry, 'entry_load'):
       for other_entry in system.entries().values():
-        if not other_entry.loaded and other_entry.id != entry.id:
+        if other_entry.id != entry.id and (not other_entry.loaded or other_entry.id not in previously_loaded_entries_to_reload):
+          # WARN: Usually ALL previously loaded and initialized entries should be in previously_loaded_entries_to_reload (for the rule above, if i'm loading and entry with entry_load method, this invalidates all previously loaded entries), so the condition below should skip all of these entries. The only exception happens if the presence of "entry_load" method changes between the code above and the code below (for example, the "entry_load" method is defined by the scripting module via scripting.entry_load)
+          # In this situation, entry.entry_load(other_entry) is called, even if it's already called before (by a previous "entry" version). We print a warning about this. (It's not convenient to invalidate the entry now)
+          if other_entry.loaded and other_entry.id not in previously_loaded_entries_to_reload:
+            logging.warn("NODE_SYSTEM> Calling {eid}.entry_load on {eid2}, but {eid2} has not been reloaded (during the reloading check {eid}.entry_load was not present). So it's possibile {eid}.entry_load has been called before on {eid2} (by a previous {eid} version).".format(eid = entry.id, eid2 = other_entry.id))
           entry_invoke(entry, 'entry_load', other_entry)
 
   for entry in loading_defs.values():
-    # entry_install: calls previously_loaded.entry_install(entry). I consider loaded in the past and initialized, and loading now, but already called by this callback
+    # entry_install: calls previously_loaded.entry_install(entry). I process loaded in the past and initialized entries, and loading now entries, but only already called by this callback
     for previously_loaded_entry in system.entries().values():
       if previously_loaded_entry.is_local and previously_loaded_entry.id not in loading_defs and previously_loaded_entry.id not in previously_loaded_entries_to_reload:
         if 'install_on' in previously_loaded_entry.definition:
@@ -148,12 +153,16 @@ def _on_system_entry_load_batch(loading_defs):
           if conf:
             entry_invoke(previously_loaded_entry, 'entry_install', entry, conf)
     
-    # entry_install on currently loading entries: calls entry.entry_install(other_entry) I consider all entries loading now, even if already processed by this callback. I don't consider loaded and initialized entries (they are in previously_loaded_entries_to_reload)
+    # entry_install on currently loading entries and initialized ones: calls entry.entry_install(other_entry). I process all entries loading now, even if already processed by this callback. I consider loaded and initialized entries only if NOT in previously_loaded_entries_to_reload (they should be reloaded, it's useless to call methods on them).
     if entry.type == 'module' and 'install_on' in entry.definition:
       for other_entry in system.entries().values():
-        if not other_entry.loaded and other_entry.id != entry.id:
+        if other_entry.id != entry.id and (not other_entry.loaded or other_entry.id not in previously_loaded_entries_to_reload):
           conf = _entry_install_on_conf(entry, entry.definition['install_on'], other_entry)
           if conf:
+            # WARN: Usually ALL previously loaded and initialized entries (matching the install_on rule) should be in previously_loaded_entries_to_reload (for the rule above), so the condition below should skip all of these entries. The only exception happens if the presence of "entry_install" method, or the install_rule, changes between the code above and the code below (for example, the "entry_install" method is defined by the scripting module via scripting.entry_load)
+            # In this situation, entry.entry_install(other_entry) is called, even if it's already called before (by a previous "entry" version). We print a warning about this. (It's not convenient to invalidate the entry now)
+            if other_entry.loaded and other_entry.id not in previously_loaded_entries_to_reload:
+              logging.warn("NODE_SYSTEM> Calling {eid}.entry_install on {eid2}, but {eid2} has not been reloaded (during the reloading check {eid}.entry_install was not present or the install rule was different). So it's possibile {eid}.entry_install has been called before on {eid2} (by a previous {eid} version).".format(eid = entry.id, eid2 = other_entry.id))
             entry_invoke(entry, 'entry_install', other_entry, conf)
 
   return previously_loaded_entries_to_reload
