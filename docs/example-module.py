@@ -332,6 +332,7 @@ SYSTEM_HANDLER_ORDER_handlername = -10
 # In generale la definizione di self_entry è in caricamento, può ancora essere modificata, e quindi mancano diverse normalizzazioni ed espansioni (ad esempio dei topic di publish / subscribe)
 def load(self_entry):
   # Se si vogliono prendere i metadati definiti da configurazione guardare su entry.definition (questi verrano poi uniti al risultato di questa chiamata)
+  # self_entry.definition.che contiene già la definizione impostata dal modulo + la definizione caricata da config
   # self_entry.config ancora non è initializzato, usare self_entry.definition['config']
   if self_entry.definition['config']['myconfig']:
     pass
