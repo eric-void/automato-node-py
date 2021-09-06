@@ -52,14 +52,21 @@ def run(entry):
           for eventname in entry.influxdb_event_buffer[entry_id]:
             for k in entry.influxdb_event_buffer[entry_id][eventname]:
               for d in entry.influxdb_event_buffer[entry_id][eventname][k]:
-                if d['changed_params']:
+                # Keep only primitive values
+                p = {x: d['changed_params'][x] for x in d['changed_params'] if isinstance(d['changed_params'][x], (int, str, bool, float))}
+                if p:
                   _write_client.write(entry.config['influxdb_bucket'], entry.config['influxdb_org'], {
                     "measurement": entry_id + "." + eventname,
                     "tags": d['keys'],
-                    "fields": d['changed_params'],
+                    "fields": p,
                     "time": datetime.datetime.utcfromtimestamp(d['time']),
                   })
               entry.influxdb_event_buffer[entry_id][eventname][k] = []
+
+
+
+
+  
 
 """
 Codice di test (occorre mettere SYNCHRONOUS altrimenti quando esce lo script non ha ancora inviato)
