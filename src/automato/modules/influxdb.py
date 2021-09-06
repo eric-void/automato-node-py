@@ -42,7 +42,7 @@ def on_all_events(installer_entry, entry, eventname, eventdata, caller, publishe
       if k not in installer_entry.influxdb_event_buffer[entry.id][eventname]:
         installer_entry.influxdb_event_buffer[entry.id][eventname][k] = [ eventdata ]
       else:
-        installer_entry.influxdb_event_buffer[entry.id][eventname][k].append([ eventdata ])
+        installer_entry.influxdb_event_buffer[entry.id][eventname][k].append(eventdata)
 
 def run(entry):
   with entry.influxdb_event_buffer_lock:
@@ -52,7 +52,6 @@ def run(entry):
           for eventname in entry.influxdb_event_buffer[entry_id]:
             for k in entry.influxdb_event_buffer[entry_id][eventname]:
               for d in entry.influxdb_event_buffer[entry_id][eventname][k]:
-                print(str(d))
                 if d['changed_params']:
                   _write_client.write(entry.config['influxdb_bucket'], entry.config['influxdb_org'], {
                     "measurement": entry_id + "." + eventname,
