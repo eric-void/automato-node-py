@@ -243,11 +243,13 @@ def on_subscribe_all_messages(entry, subscribed_message):
   listened_events = [e for e in subscribed_message.message.events() if e['name'] == 'connected' or e['name'] == 'alive' or e['name'] == 'failure']
   if firstpm and firstpm.entry.is_local and len(listened_events) == 0:
     if not hasattr(firstpm.entry, 'health_config_alive_on_message'):
-      logging.error("HEALTH> entry {id} has NO health_config_alive_on_message".format(id = firstpm.entry.id))
+      if firstpm.entry.id != entry.id:
+        logging.error("HEALTH> entry {id} has NO health_config_alive_on_message".format(id = firstpm.entry.id))
     elif firstpm.entry.health_config_alive_on_message:
       event_connected(entry, firstpm.entry, 'connected', { 'params': { 'value': True } }, '', None, from_generic_message = True)
     if not hasattr(firstpm.entry, 'health_config_dead_message_timeout'):
-      logging.error("HEALTH> entry {id} has NO health_config_dead_message_timeout".format(id = firstpm.entry.id))
+      if firstpm.entry.id != entry.id:
+        logging.error("HEALTH> entry {id} has NO health_config_dead_message_timeout".format(id = firstpm.entry.id))
     elif firstpm.entry.health_config_dead_message_timeout:
       entry.health_dead_checker[firstpm.entry.id] = (system.time() + firstpm.entry.health_config_dead_message_timeout, 'silent for too long')
   
