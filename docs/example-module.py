@@ -77,6 +77,7 @@ entry.events = {} # INTERNO: usare system.entry_events_supported(). A uso preval
 entry.actions = {} # INTERNO: usare system.entry_actions_supported(). Come sopra per events
 entry.on(event, listener, condition_eval = None, reference_entry = None, reference_tag = None)
 # def listener(entry, eventname, eventdata, caller, published_message): ... eventdata = { 'params': {...}, 'changed_params': {...} }, caller = "message|import|events_passthrough", published_message = source message (null for import)
+#   For eventdata description @see system._entry_event_publish
 entry.do(action, params = {}, init_exec = None)
 
 # E' possibile arricchire entry con qualsiasi elemento si vuole mantenere tra le chiamate
@@ -291,6 +292,7 @@ definition = {
   "on": {
     "entry_id.event(condition)": { # condition è nella forma "js:params['value'] == 1 && params['value'] == 1" ...
       "handler": on_event, # def on_event(entry, eventname, eventdata, caller, published_message): eventdata = {'params': {...}, 'changed_params': {...}}, caller = "message|import|events_passthrough", published_message = source message (null for import)
+        # For eventdata description @see system._entry_event_publish
       "script": [...], # Parametry passati: entry, on_entry, eventname, eventdata, params, caller, published_message, caller = "message|import|events_passthrough", published_message = source message (null for import). "entry" passato allo script è quello che ha impostato questa definition, mentre "on_entry" è quello specificato nell'"on" (del quale è stato preso l'evento)
       "do": "entry@NODE.action(init)", # init è nella forma "js:params['value'] = 1; params['value'] = 1;"
       "do": ["entry@NODE.action(init)", ...],
