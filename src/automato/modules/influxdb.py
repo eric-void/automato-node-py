@@ -20,12 +20,14 @@ definition = {
     "influxdb_bucket": "",
     "influxdb_token": "",
     "influxdb_debug": False,
+    "influxdb_verify_ssl": False,
     
-    "influxdb2_url": "http://192.168.1.10:8086",
+    "influxdb2_url": "https://192.168.1.10:8086",
     "influxdb2_org": "default",
     "influxdb2_bucket": "automato",
     "influxdb2_token": "RhwPm_bchO2vwqj37fYNWTibmUF0zwISyBMypjrtF5bPLLNNzDUeOcAFQ_xeYldrh8o9U_IWSLqSGWCU450q7Q==",
     "influxdb2_debug": False,
+    "influxdb2_verify_ssl": False,
     
     "ignore_events": ["clock", "stats"],
   },
@@ -52,17 +54,17 @@ def on_all_events(installer_entry, entry, eventname, eventdata, caller, publishe
 def run(entry):
   with entry.influxdb_event_buffer_lock:
     if entry.config['influxdb_url']:
-      _influxdb_write(entry, entry.config['influxdb_url'], entry.config['influxdb_token'], entry.config['influxdb_org'], entry.config['influxdb_bucket'], entry.config['influxdb_debug'], False)
+      _influxdb_write(entry, entry.config['influxdb_url'], entry.config['influxdb_token'], entry.config['influxdb_org'], entry.config['influxdb_bucket'], entry.config['influxdb_debug'], entry.config['influxdb_verify_ssl'], True)
     if entry.config['influxdb2_url']:
-      _influxdb_write(entry, entry.config['influxdb2_url'], entry.config['influxdb2_token'], entry.config['influxdb2_org'], entry.config['influxdb2_bucket'], entry.config['influxdb2_debug'], True)
+      _influxdb_write(entry, entry.config['influxdb2_url'], entry.config['influxdb2_token'], entry.config['influxdb2_org'], entry.config['influxdb2_bucket'], entry.config['influxdb2_debug'], entry.config['influxdb2_verify_ssl'], True)
 
     for entry_id in entry.influxdb_event_buffer:
       for eventname in entry.influxdb_event_buffer[entry_id]:
         for k in entry.influxdb_event_buffer[entry_id][eventname]:
           entry.influxdb_event_buffer[entry_id][eventname][k] = []
 
-def _influxdb_write(entry, url, token, org, bucket, debug, convert):
-  with InfluxDBClient(url = url, token = token, org = org, debug = debug) as _client:
+def _influxdb_write(entry, url, token, org, bucket, debug, verify_ssl, convert):
+  with InfluxDBClient(url = url, token = token, org = org, debug = debug, verify_ssl = verify_ssl) as _client:
     with _client.write_api(write_options=WriteOptions(batch_size=500, flush_interval=10_000, jitter_interval=2_000, retry_interval=5_000, max_retries=2, max_retry_delay=30_000, exponential_base = 2)) as _write_client:
       for entry_id in entry.influxdb_event_buffer:
         for eventname in entry.influxdb_event_buffer[entry_id]:
