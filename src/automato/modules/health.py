@@ -210,13 +210,14 @@ def _health_checker_timer(entry):
           check_health_status(source_entry)
       entry.health_dead_checker = { entry_id: entry.health_dead_checker[entry_id] for entry_id in entry.health_dead_checker if entry_id not in timeouts }
     
-    for t in entry.health_publish_checker:
-      for e in entry.health_publish_checker[t]:
-        if entry.health_publish_checker[t][e]['last_published'] > 0 and now - entry.health_publish_checker[t][e]['last_published'] > entry.health_publish_checker[t][e]['interval']:
-          target_entry = system.entry_get(e)
-          if target_entry and t not in target_entry.health_publish:
-            target_entry.health_publish[t] = now
-            check_health_status(target_entry)
+    if node.load_level() == 0:
+      for t in entry.health_publish_checker:
+        for e in entry.health_publish_checker[t]:
+          if entry.health_publish_checker[t][e]['last_published'] > 0 and now - entry.health_publish_checker[t][e]['last_published'] > entry.health_publish_checker[t][e]['interval']:
+            target_entry = system.entry_get(e)
+            if target_entry and t not in target_entry.health_publish:
+              target_entry.health_publish[t] = now
+              check_health_status(target_entry)
 
     system.sleep(entry.config['health-checker-secs'])
 
