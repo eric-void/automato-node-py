@@ -367,9 +367,9 @@ def run_step():
             if throttle_policy != 'skip':
               entry_invoke_threaded(entry_id, 'run')
             else:
-              logging.debug("#{entry}> system overload ({load}), skipped invokation of {method}.".format(entry=entry.id, load = load_level, method='run'))
+              logging.debug("#{entry}> system overload ({load}), skipped invokation of {method}.".format(entry=entry.id, load = load_level(), method='run'))
           else:
-            logging.debug("#{entry}> system overload ({load}), postponed invokation of {method}.".format(entry=entry.id, load = load_level, method='run'))
+            logging.debug("#{entry}> system overload ({load}), postponed invokation of {method}.".format(entry=entry.id, load = load_level(), method='run'))
 
       if 'publish' in entry.definition:
         for topic_rule in entry.definition['publish']:
@@ -407,9 +407,9 @@ def run_step():
                 if throttle_policy != 'skip':
                   entry_invoke_publish(entry, topic_rule, entry.definition['publish'][topic_rule])
                 else:
-                  logging.debug("#{entry}> system overload ({load}), skipped invokation of publish {method}.".format(entry=entry.id, load = load_level, method=topic_rule))
+                  logging.debug("#{entry}> system overload ({load}), skipped invokation of publish {method}.".format(entry=entry.id, load = load_level(), method=topic_rule))
               else:
-                logging.debug("#{entry}> system overload ({load}), postponed invokation of publish {method}.".format(entry=entry.id, load = load_level, method=topic_rule))
+                logging.debug("#{entry}> system overload ({load}), postponed invokation of publish {method}.".format(entry=entry.id, load = load_level(), method=topic_rule))
 
       _s1 = system._stats_start()
       entry.store_data(False)
