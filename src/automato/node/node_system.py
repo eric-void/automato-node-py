@@ -310,7 +310,7 @@ def load_level():
   """
   @return load_level. 0 = low, 1 = high / 2 = very high (follow definition['run_throttle'] or auto skip/wait based on timing), critical (skip everything, except "force" transformed to "wait")
   """
-  delay = system.broker().queueDelay();
+  delay = system.broker().queueDelayCurrent();
   return 0 if delay < 1000 else (1 if delay < 5000 else (2 if delay < 20000 else 3))
 
 def _run_step_throttle_policy(entry, definition, topic_rule = None):
