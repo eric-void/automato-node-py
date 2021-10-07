@@ -22,13 +22,13 @@ definition = {
     "influxdb_debug": False,
     "influxdb_verify_ssl": False,
     
-    "influxdb2_url": "https://192.168.1.10:8086",
-    "influxdb2_org": "default",
-    "influxdb2_bucket": "automato",
-    "influxdb2_token": "RhwPm_bchO2vwqj37fYNWTibmUF0zwISyBMypjrtF5bPLLNNzDUeOcAFQ_xeYldrh8o9U_IWSLqSGWCU450q7Q==",
+    "influxdb2_url": "",
+    "influxdb2_org": "",
+    "influxdb2_bucket": "",
+    "influxdb2_token": "",
     "influxdb2_debug": False,
     "influxdb2_verify_ssl": False,
-    
+
     "ignore_events": ["clock", "stats"],
   },
   "run_interval": 60,
