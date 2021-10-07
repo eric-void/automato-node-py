@@ -305,6 +305,27 @@ def run():
   except:
     logging.exception('system failure on run')
 
+
+def load_level():
+  """
+  @return load_level. 0 = low, 1 = high / 2 = very high (follow definition['run_throttle'] or auto skip/wait based on timing), critical (skip everything, except "force" transformed to "wait")
+  """
+  delay = system.broker().queueDelay();
+  return 0 if delay < 1000 else (1 if delay < 5000 else (2 if delay < 20000 else 3))
+
+def _run_step_throttle_policy(entry, definition, topic_rule = None):
+  """
+  Return throttle policy for a specific execution handler ("run" method or "topic_rule" publisher)
+  """
+  load_level = load_level()
+  throttle_policy = 'force' if load_level <= 0 else ('skip' if load_level >= 3 else (definition['run_throttle'] if 'run_thottle' in definition else ('skip' if entry.data['next_run' + (('_' + topic_rule) if topic_rule else '')] - entry.data['last_run' + (('_' + topic_rule) if topic_rule else '')] < 3600 else 'wait')))
+  
+  if isinstance(throttle_policy, list):
+    throttle_policy = throttle_policy[0 if load_level == 1 else 1]
+  if load_level >= 3:
+    throttle_policy = 'skip' if throttle_policy != 'force' else 'wait'
+  return throttle_policy
+
 def run_step():
   _s = system._stats_start()
   now = system.time()
@@ -312,50 +333,83 @@ def run_step():
   for entry_id in clone_entry_names:
     entry = system.entry_get(entry_id)
     if entry and entry.is_local:
-      if 'run_interval' in entry.definition and utils.read_duration(entry.definition['run_interval']) > 0 and entry_implements(entry_id, 'run') and ('last_run' not in entry.data or now - entry.data['last_run'] > utils.read_duration(entry.definition['run_interval'])):
-        entry.data['last_run'] = now
-        entry_invoke_threaded(entry_id, 'run')
-
-      if 'run_cron' in entry.definition and entry_implements(entry_id, 'run'):
-        if not ('cron' in entry.data and entry.data['cron'] == entry.definition['run_cron'] and 'next_run' in entry.data):
-          if not croniter.is_valid(entry.definition['run_cron']):
-            logging.error('#{id}> invalid cron rule: {cron}'.format(id = entry_id, cron = entry.definition['run_cron']))
-            del entry.definition['run_cron']
-          else:
-            entry.data['cron'] = entry.definition['run_cron']
-            #itr = croniter(entry.data['cron'], datetime.datetime.now().astimezone())
-            itr = croniter(entry.data['cron'], datetime.datetime.fromtimestamp(now).astimezone())
-            entry.data['next_run'] = itr.get_next()
-        if 'cron' in entry.data and entry.data['cron'] == entry.definition['run_cron'] and 'next_run' in entry.data and now >= entry.data['next_run']:
-          entry_invoke_threaded(entry_id, 'run')
-          entry.data['last_run'] = now
+      # Initialization / check configuration validity
+      if 'run_interval' in entry.definition and utils.read_duration(entry.definition['run_interval']) <= 0:
+        logging.error('#{id}> invalid run_interval: {run_interval}'.format(id = entry_id, run_interval = entry.definition['run_interval']))
+        del entry.definition['run_interval']
+      if 'run_cron' in entry.definition and entry_implements(entry_id, 'run') and not ('cron' in entry.data and entry.data['cron'] == entry.definition['run_cron'] and 'next_run' in entry.data):
+        if not croniter.is_valid(entry.definition['run_cron']):
+          logging.error('#{id}> invalid cron rule: {cron}'.format(id = entry_id, cron = entry.definition['run_cron']))
+          del entry.definition['run_cron']
+        else:
+          entry.data['cron'] = entry.definition['run_cron']
           #itr = croniter(entry.data['cron'], datetime.datetime.now().astimezone())
           itr = croniter(entry.data['cron'], datetime.datetime.fromtimestamp(now).astimezone())
           entry.data['next_run'] = itr.get_next()
+      if 'last_run' not in entry.data:
+        entry.data['last_run'] = 0
+      if 'next_run' not in entry.data:
+        entry.data['next_run'] = now
+      
+      if entry_implements(entry_id, 'run') and ('run_interval' in entry.definition or 'run_cron' in entry.definition):
+        throttle_policy = _run_step_throttle_policy(entry, entry.definition, None)
+        
+        if now >= entry.data['next_run']:
+          if throttle_policy == 'force' or throttle_policy == 'skip' or (isinstance(throttle_policy, int) and now - entry.data['last_run'] > throttle_policy):
+            entry.data['last_run'] = now
+            if 'run_interval' in entry.definition:
+              entry.data['next_run'] = now + utils.read_duration(entry.definition['run_interval'])
+            else:
+              #itr = croniter(entry.data['cron'], datetime.datetime.now().astimezone())
+              itr = croniter(entry.data['cron'], datetime.datetime.fromtimestamp(now).astimezone())
+              entry.data['next_run'] = itr.get_next()
+
+            if throttle_policy != 'skip':
+              entry_invoke_threaded(entry_id, 'run')
+            else:
+              logging.debug("#{entry}> system overload ({load}), skipped invokation of {method}.".format(entry=entry.id, load = load_level, method='run'))
+          else:
+            logging.debug("#{entry}> system overload ({load}), postponed invokation of {method}.".format(entry=entry.id, load = load_level, method='run'))
 
       if 'publish' in entry.definition:
         for topic_rule in entry.definition['publish']:
-          if 'run_interval' in entry.definition['publish'][topic_rule] and utils.read_duration(entry.definition['publish'][topic_rule]['run_interval']) > 0 and ('last_run_' + topic_rule not in entry.data or now - entry.data['last_run_' + topic_rule] > utils.read_duration(entry.definition['publish'][topic_rule]['run_interval'])):
-            entry.data['last_run_' + topic_rule] = now
-            entry_invoke_publish(entry, topic_rule, entry.definition['publish'][topic_rule])
-            
-          if 'run_cron' in entry.definition['publish'][topic_rule]:
-            if not ('cron_' + topic_rule in entry.data and entry.data['cron_' + topic_rule] == entry.definition['publish'][topic_rule]['run_cron'] and 'next_run_' + topic_rule in entry.data):
-              if not croniter.is_valid(entry.definition['publish'][topic_rule]['run_cron']):
-                logging.error('#{id}> invalid cron rule for publishing topic rule {topic_rule}: {cron}'.format(id = entry_id, topic_rule = topic_rule, cron = entry.definition['publish'][topic_rule]['run_cron']))
-                del entry.definition['publish'][topic_rule]['run_cron']
-              else:
-                entry.data['cron_' + topic_rule] = entry.definition['publish'][topic_rule]['run_cron']
-                #itr = croniter(entry.data['cron_' + topic_rule], datetime.datetime.now().astimezone())
-                itr = croniter(entry.data['cron_' + topic_rule], datetime.datetime.fromtimestamp(now).astimezone())
-                entry.data['next_run_' + topic_rule] = itr.get_next()
-            if 'cron_' + topic_rule in entry.data and entry.data['cron_' + topic_rule] == entry.definition['publish'][topic_rule]['run_cron'] and 'next_run_' + topic_rule in entry.data and now >= entry.data['next_run_' + topic_rule]:
-              entry.data['last_run_' + topic_rule] = now
+          # Initialization / check configuration validity
+          if 'run_interval' in entry.definition['publish'][topic_rule] and utils.read_duration(entry.definition['publish'][topic_rule]['run_interval']) <= 0:
+            logging.error('#{id}> invalid run_interval for topic rule {topic_rule}: {run_interval}'.format(id = entry_id, topic_rule = topic_rule, run_interval = entry.definition['publish'][topic_rule]['run_interval']))
+            del entry.definition['publish'][topic_rule]['run_interval']
+          if 'run_cron' in entry.definition['publish'][topic_rule] and not ('cron_' + topic_rule in entry.data and entry.data['cron_' + topic_rule] == entry.definition['publish'][topic_rule]['run_cron'] and 'next_run_' + topic_rule in entry.data):
+            if not croniter.is_valid(entry.definition['publish'][topic_rule]['run_cron']):
+              logging.error('#{id}> invalid cron rule for publishing topic rule {topic_rule}: {cron}'.format(id = entry_id, topic_rule = topic_rule, cron = entry.definition['publish'][topic_rule]['run_cron']))
+              del entry.definition['publish'][topic_rule]['run_cron']
+            else:
+              entry.data['cron_' + topic_rule] = entry.definition['publish'][topic_rule]['run_cron']
               #itr = croniter(entry.data['cron_' + topic_rule], datetime.datetime.now().astimezone())
               itr = croniter(entry.data['cron_' + topic_rule], datetime.datetime.fromtimestamp(now).astimezone())
               entry.data['next_run_' + topic_rule] = itr.get_next()
-              entry_invoke_publish(entry, topic_rule, entry.definition['publish'][topic_rule])
-      
+          if 'last_run_' + topic_rule not in entry.data:
+            entry.data['last_run_' + topic_rule] = 0
+          if 'next_run_' + topic_rule not in entry.data:
+            entry.data['next_run_' + topic_rule] = now
+          
+          throttle_policy = _run_step_throttle_policy(entry, entry.definition['publish'][topic_rule], topic_rule)
+          
+          if now >= entry.data['next_run_' + topic_rule]:
+            if throttle_policy == 'force' or throttle_policy == 'skip' or (isinstance(throttle_policy, int) and now - entry.data['last_run_' + topic_rule] > throttle_policy):
+              entry.data['last_run_' + topic_rule] = now
+              if 'run_interval' in entry.definition['publish'][topic_rule]:
+                entry.data['next_run_' + topic_rule] = now + utils.read_duration(entry.definition['publish'][topic_rule]['run_interval'])
+              else:
+                #itr = croniter(entry.data['cron_' + topic_rule], datetime.datetime.now().astimezone())
+                itr = croniter(entry.data['cron_' + topic_rule], datetime.datetime.fromtimestamp(now).astimezone())
+                entry.data['next_run_' + topic_rule] = itr.get_next()
+              
+              if throttle_policy != 'skip':
+                entry_invoke_publish(entry, topic_rule, entry.definition['publish'][topic_rule])
+              else:
+                logging.debug("#{entry}> system overload ({load}), skipped invokation of publish {method}.".format(entry=entry.id, load = load_level, method=topic_rule))
+            else:
+              logging.debug("#{entry}> system overload ({load}), postponed invokation of publish {method}.".format(entry=entry.id, load = load_level, method=topic_rule))
+
       _s1 = system._stats_start()
       entry.store_data(False)
       system._stats_end('node.run.store_data', _s1)
