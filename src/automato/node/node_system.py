@@ -317,12 +317,12 @@ def _run_step_throttle_policy(entry, definition, topic_rule = None):
   """
   Return throttle policy for a specific execution handler ("run" method or "topic_rule" publisher)
   """
-  load_level = load_level()
-  throttle_policy = 'force' if load_level <= 0 else ('skip' if load_level >= 3 else (definition['run_throttle'] if 'run_thottle' in definition else ('skip' if entry.data['next_run' + (('_' + topic_rule) if topic_rule else '')] - entry.data['last_run' + (('_' + topic_rule) if topic_rule else '')] < 3600 else 'wait')))
+  level = load_level()
+  throttle_policy = 'force' if level <= 0 else ('skip' if level >= 3 else (definition['run_throttle'] if 'run_thottle' in definition else ('skip' if entry.data['next_run' + (('_' + topic_rule) if topic_rule else '')] - entry.data['last_run' + (('_' + topic_rule) if topic_rule else '')] < 3600 else 'wait')))
   
   if isinstance(throttle_policy, list):
-    throttle_policy = throttle_policy[0 if load_level == 1 else 1]
-  if load_level >= 3:
+    throttle_policy = throttle_policy[0 if level == 1 else 1]
+  if level >= 3:
     throttle_policy = 'skip' if throttle_policy != 'force' else 'wait'
   return throttle_policy
 
