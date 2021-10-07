@@ -391,24 +391,25 @@ def run_step():
           if 'next_run_' + topic_rule not in entry.data:
             entry.data['next_run_' + topic_rule] = now
           
-          throttle_policy = _run_step_throttle_policy(entry, entry.definition['publish'][topic_rule], topic_rule)
-          
-          if now >= entry.data['next_run_' + topic_rule]:
-            if throttle_policy == 'force' or throttle_policy == 'skip' or (isinstance(throttle_policy, int) and now - entry.data['last_run_' + topic_rule] > throttle_policy):
-              entry.data['last_run_' + topic_rule] = now
-              if 'run_interval' in entry.definition['publish'][topic_rule]:
-                entry.data['next_run_' + topic_rule] = now + utils.read_duration(entry.definition['publish'][topic_rule]['run_interval'])
+          if 'run_interval' in entry.definition['publish'][topic_rule] or 'run_cron' in entry.definition['publish'][topic_rule]:
+            throttle_policy = _run_step_throttle_policy(entry, entry.definition['publish'][topic_rule], topic_rule)
+            
+            if now >= entry.data['next_run_' + topic_rule]:
+              if throttle_policy == 'force' or throttle_policy == 'skip' or (isinstance(throttle_policy, int) and now - entry.data['last_run_' + topic_rule] > throttle_policy):
+                entry.data['last_run_' + topic_rule] = now
+                if 'run_interval' in entry.definition['publish'][topic_rule]:
+                  entry.data['next_run_' + topic_rule] = now + utils.read_duration(entry.definition['publish'][topic_rule]['run_interval'])
+                else:
+                  #itr = croniter(entry.data['cron_' + topic_rule], datetime.datetime.now().astimezone())
+                  itr = croniter(entry.data['cron_' + topic_rule], datetime.datetime.fromtimestamp(now).astimezone())
+                  entry.data['next_run_' + topic_rule] = itr.get_next()
+                
+                if throttle_policy != 'skip':
+                  entry_invoke_publish(entry, topic_rule, entry.definition['publish'][topic_rule])
+                else:
+                  logging.debug("#{entry}> system overload ({load}), skipped invokation of publish {method}.".format(entry=entry.id, load = load_level, method=topic_rule))
               else:
-                #itr = croniter(entry.data['cron_' + topic_rule], datetime.datetime.now().astimezone())
-                itr = croniter(entry.data['cron_' + topic_rule], datetime.datetime.fromtimestamp(now).astimezone())
-                entry.data['next_run_' + topic_rule] = itr.get_next()
-              
-              if throttle_policy != 'skip':
-                entry_invoke_publish(entry, topic_rule, entry.definition['publish'][topic_rule])
-              else:
-                logging.debug("#{entry}> system overload ({load}), skipped invokation of publish {method}.".format(entry=entry.id, load = load_level, method=topic_rule))
-            else:
-              logging.debug("#{entry}> system overload ({load}), postponed invokation of publish {method}.".format(entry=entry.id, load = load_level, method=topic_rule))
+                logging.debug("#{entry}> system overload ({load}), postponed invokation of publish {method}.".format(entry=entry.id, load = load_level, method=topic_rule))
 
       _s1 = system._stats_start()
       entry.store_data(False)
