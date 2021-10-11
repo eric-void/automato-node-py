@@ -198,8 +198,14 @@ def publish_all_entries_status(entry, topic_rule, topic_definition):
   entry.publish('', status)
 
 def _health_checker_timer(entry):
+  health_disable_load_level = 0
   while not threading.currentThread()._destroyed:
     now = system.time()
+    
+    if node.load_level() > 0:
+      health_disable_load_level = now
+    elif node.load_level() == 0 and now - health_disable_load_level > 60:
+      health_disable_load_level = 0
     
     timeouts = [ entry_id for entry_id in entry.health_dead_checker if now > entry.health_dead_checker[entry_id][0] ]
     if timeouts:
@@ -210,7 +216,7 @@ def _health_checker_timer(entry):
           check_health_status(source_entry)
       entry.health_dead_checker = { entry_id: entry.health_dead_checker[entry_id] for entry_id in entry.health_dead_checker if entry_id not in timeouts }
     
-    if node.load_level() == 0:
+    if health_disable_load_level == 0:
       for t in entry.health_publish_checker:
         for e in entry.health_publish_checker[t]:
           if entry.health_publish_checker[t][e]['last_published'] > 0 and now - entry.health_publish_checker[t][e]['last_published'] > entry.health_publish_checker[t][e]['interval']:
