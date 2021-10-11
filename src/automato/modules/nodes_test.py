@@ -111,7 +111,7 @@ def test_run(entries):
         'otherbutton1@OTHERNODE': {'publish': {'device/otherbutton1/input': {'type': 'int', 'events': {'input': 'js:({value: payload})'}}}, 'type': 'device', 'subscribe': {}}, 
         'otherlight2@OTHERNODE': {'publish': {'device/otherlight2/status': {'type': 'int', 'events': {'output': 'js:({value: payload})'}}}, 'subscribe': {'device/otherlight2/turnon': {'actions': {'output-set': "js:params['value']"}}}, 'type': 'device'}}
     }})
-  
+
   t1 = system.time()
   test.assertPublish('t2', 'device/otherbutton1/input', 1,
     assertEvents = {"input": { "value": '1' }},
@@ -142,3 +142,24 @@ def test_run(entries):
       "last_seen": ()
     }}
   )
+  
+  system.time_offset(5)
+  t1 = system.time()
+  metadata = {
+    'from_node': other_node_config['name'],
+    'time': t1,
+    'nodes': {other_node_config['name']: { 'description': '', 'time': t1}},
+    'entries': entries_exportable
+  }  
+  test.assertx('t5', 
+    waitPublish = [('automato/metadata', metadata)],
+    assertSubscribe = {'automato/metadata': {
+      "from_node": "TEST",
+      "time": ('d', t1),
+      "nodes": {"TEST": {"description": "", "time": ('d', t0, 5) }, "OTHERNODE": {"description": "", "time": ('d', t1)}},
+      'entries': {
+        'nodes@TEST': ('*', ), 'scripting@TEST': ('*', ),
+        'light1@TEST': {'publish': {'device/light1/status': {'type': 'int', 'events': {'output': 'js:({value: payload})'}}}, 'subscribe': {'device/light1/set': {'actions': {'output-set': "js:params['value']"}}}, 'type': 'device'},
+        'otherbutton1@OTHERNODE': {'publish': {'device/otherbutton1/input': {'type': 'int', 'events': {'input': 'js:({value: payload})'}}}, 'type': 'device', 'subscribe': {}}, 
+        'otherlight2@OTHERNODE': {'publish': {'device/otherlight2/status': {'type': 'int', 'events': {'output': 'js:({value: payload})'}}}, 'subscribe': {'device/otherlight2/turnon': {'actions': {'output-set': "js:params['value']"}}}, 'type': 'device'}}
+    }})
