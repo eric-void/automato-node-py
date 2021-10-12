@@ -11,7 +11,7 @@ definition = {
     'master': False, # At least a node should have "master: True". That node will respond to automato/data requests
     'compress': True,
     'local': False, # If set to TRUE, this node will send its entries to other nodes, but it will not read other node's entries. Use this to reduce system load on big networks, and ONLY if this node don't need to look for remote entries (you can't use events or actions from remote nodes if turned on!)
-    'dead_time': '45m', # If a node don't send its metadata at least every X seconds, consider it as dead. It should be > than max(definition['publish']['./metadata']['run_interval'])
+    'dead_time': '90m', # If a node don't send its metadata at least every X seconds, consider it as dead. It should be > than max(definition['publish']['./metadata']['run_interval'])
   },
   
   'description': _('Automato remote nodes manager'),
@@ -143,8 +143,10 @@ def run(entry):
     if dead:
       for node in dead:
         system.entry_unload_node_entries(node)
+        del entry.data['seen'][node]
+        del entry.data['nodes'][node]
         entry.publish('./dead-node', { 'name': node, 'last_seen': entry.data['seen'][node]['his_time'], 'time': t })
-      entry.data['seen'] = {node:v for node,v in entry.data['seen'].items() if t - entry.data['seen'][node]['his_time'] <= utils.read_duration(entry.config['dead_time'])}
+      #entry.data['seen'] = {node:v for node,v in entry.data['seen'].items() if t - entry.data['seen'][node]['his_time'] <= utils.read_duration(entry.config['dead_time'])}
       publish_metadata(entry, entry.topic('./metadata'))
         
     # Can't kill myself
