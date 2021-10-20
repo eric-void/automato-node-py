@@ -159,7 +159,7 @@ def entry_health_status(entry):
           res['reason'] = res['reason'] + (', ' if res['reason'] else '') + _('{entry} is in state: ' + entry.health_required[e]).format(entry = e)
     if entry.health_publish:
       for t in entry.health_publish:
-        res['reason'] = res['reason'] + (', ' if res['reason'] else '') + _('{topic} not published as expected').format(topic = t)
+        res['reason'] = res['reason'] + (', ' if res['reason'] else '') + _('{topic} not published as expected (last published: {last}, check: {now}, diff: {diff}, interval: {interval}, delay: {delay})').format(topic = t, now = entry.health_publish[t][0], last = entry.health_publish[t][1], diff = entry.health_publish[t][0] - entry.health_publish[t][1], interval = entry.health_publish[t][2], delay = entry.health_publish[t][3])
     if res['reason']:
       res['value'] = 'failure'
 
@@ -217,12 +217,13 @@ def _health_checker_timer(entry):
       entry.health_dead_checker = { entry_id: entry.health_dead_checker[entry_id] for entry_id in entry.health_dead_checker if entry_id not in timeouts }
     
     if health_disable_load_level == 0:
+      delay = system.broker().queueDelay() * 2 if not system.test_mode else 0
       for t in entry.health_publish_checker:
         for e in entry.health_publish_checker[t]:
-          if entry.health_publish_checker[t][e]['last_published'] > 0 and now - entry.health_publish_checker[t][e]['last_published'] > entry.health_publish_checker[t][e]['interval']:
+          if entry.health_publish_checker[t][e]['last_published'] > 0 and now - entry.health_publish_checker[t][e]['last_published'] > entry.health_publish_checker[t][e]['interval'] + delay:
             target_entry = system.entry_get(e)
             if target_entry and t not in target_entry.health_publish:
-              target_entry.health_publish[t] = now
+              target_entry.health_publish[t] = [now, entry.health_publish_checker[t][e]['last_published'], entry.health_publish_checker[t][e]['interval'], delay]
               check_health_status(target_entry)
 
     system.sleep(entry.config['health-checker-secs'])
