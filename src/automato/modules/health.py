@@ -198,25 +198,41 @@ def publish_all_entries_status(entry, topic_rule, topic_definition):
   entry.publish('', status)
 
 def _health_checker_timer(entry):
+  # if system load_level is high i disable health_publish_checker and health_dead_checker. When the load returns low, i'll reset health checker data (to avoid fake health problems)
   health_disable_load_level = 0
+  
   while not threading.currentThread()._destroyed:
     now = system.time()
     
     if node.load_level() > 0:
       health_disable_load_level = now
-    elif node.load_level() == 0 and now - health_disable_load_level > 60:
+    elif health_disable_load_level > 0 and node.load_level() == 0 and now - health_disable_load_level > 60:
       health_disable_load_level = 0
-    
-    timeouts = [ entry_id for entry_id in entry.health_dead_checker if now > entry.health_dead_checker[entry_id][0] ]
-    if timeouts:
-      for entry_id in timeouts:
+      # if a moment ago the system was too load, and now is ok, i must consider health_dead_checker and health_publish_checker data as invalid and reset them (or i'll report a lot of fake health problems)
+      
+      # health_dead_checker
+      for entry_id in entry.health_dead_checker:
         source_entry = system.entry_get(entry_id)
         if source_entry:
-          source_entry.health_dead = entry.health_dead_checker[entry_id][1]
-          check_health_status(source_entry)
-      entry.health_dead_checker = { entry_id: entry.health_dead_checker[entry_id] for entry_id in entry.health_dead_checker if entry_id not in timeouts }
+          entry.health_dead_checker[entry_id][0] = system.time() + source_entry.health_config_dead_disconnected_timeout
+
+      # health_publish_checker
+      for t in entry.health_publish_checker:
+        for e in entry.health_publish_checker[t]:
+          entry.health_publish_checker[t][e]['last_published'] = system.time()
     
     if health_disable_load_level == 0:
+      # health_dead_checker
+      timeouts = [ entry_id for entry_id in entry.health_dead_checker if now > entry.health_dead_checker[entry_id][0] ]
+      if timeouts:
+        for entry_id in timeouts:
+          source_entry = system.entry_get(entry_id)
+          if source_entry:
+            source_entry.health_dead = entry.health_dead_checker[entry_id][1]
+            check_health_status(source_entry)
+        entry.health_dead_checker = { entry_id: entry.health_dead_checker[entry_id] for entry_id in entry.health_dead_checker if entry_id not in timeouts }
+      
+      # health_publish_checker
       delay = system.broker().queueDelay() * 2 if not system.test_mode else 0
       for t in entry.health_publish_checker:
         for e in entry.health_publish_checker[t]:
