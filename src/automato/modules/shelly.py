@@ -27,7 +27,7 @@ device_types = {
   'shellydimmer': { 'relay_name': 'light' }, # TODO Non ha relay, ma per ora mi serve perchè anche lui definisce publish['output'] - che si potrebbe togliere
   'shellydimmer2': { 'relay_name': 'light' },
   'shellyem': { 'emeter_port:def': ['0', '1'], 'input:def': None },
-  'shelly3em': { 'emeter_port:def': ['0', '1', '2'], 'input:def': None },
+  'shellyem3': { 'emeter_port:def': ['0', '1', '2'], 'input:def': None },
   #TODO shellies/shellydimmer2-E09806966EFB/light/0/status	{"ison":true,"has_timer":false,"timer_started":0,"timer_duration":0,"timer_remaining":0,"mode":"white","brightness":41}
 }
 
