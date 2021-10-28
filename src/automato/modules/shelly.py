@@ -143,7 +143,7 @@ def entry_install(installer_entry, entry, conf):
       }
     }
     definition_extra['publish']['total'] = {
-      'topic': '/^' + base_topic + 'emeter/(([0-9]+)/)?total/',
+      'topic': '/^' + base_topic + 'emeter/(([0-9]+)/)?total$/',
       'description': _('Total energy in Wh'),
       'type': 'float',
       'notify_level': 'debug', 'notify': _("Shelly device '{caption}' emeter #{matches[1]} energy detected is: {_[payload]}Wh"),
@@ -153,7 +153,7 @@ def entry_install(installer_entry, entry, conf):
       }
     }
     definition_extra['publish']['total_returned'] = {
-      'topic': '/^' + base_topic + 'emeter/(([0-9]+)/)?total_returned/',
+      'topic': '/^' + base_topic + 'emeter/(([0-9]+)/)?total_returned$/',
       'description': _('Total energy returned to the grid in Wh'),
       'type': 'float',
       'notify_level': 'debug', 'notify': _("Shelly device '{caption}' relay #{matches[1]} returned energy detected is: {_[payload]}Wh"),
