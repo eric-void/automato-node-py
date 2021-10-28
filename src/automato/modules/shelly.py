@@ -26,6 +26,8 @@ device_types = {
   'shellyswitch25': { 'output_port:def': ['0', '1'], 'input_port:def': ['0', '1'] },
   'shellydimmer': { 'relay_name': 'light' }, # TODO Non ha relay, ma per ora mi serve perchè anche lui definisce publish['output'] - che si potrebbe togliere
   'shellydimmer2': { 'relay_name': 'light' },
+  'shellyem': { 'emeter_port:def': ['0', '1'], 'input:def': None },
+  'shelly3em': { 'emeter_port:def': ['0', '1', '2'], 'input:def': None },
   #TODO shellies/shellydimmer2-E09806966EFB/light/0/status	{"ison":true,"has_timer":false,"timer_started":0,"timer_duration":0,"timer_remaining":0,"mode":"white","brightness":41}
 }
 
@@ -57,8 +59,7 @@ def entry_install(installer_entry, entry, conf):
         'overpower': { 'caption': 'off (OVERPOWER)' }, # TODO Gestire
       },
     },
-    'notify': _("Shelly device '{caption}' relay #{matches[1]} state is: {_[payload!caption]}"),
-    'notify_level': 'debug',
+    'notify_level': 'debug', 'notify': _("Shelly device '{caption}' relay #{matches[1]} state is: {_[payload!caption]}"),
     'events': {
       'output': 'js:payload == "on" ? ({value: 1, port: matches[1]}) : (payload == "off" || payload == "overpower" ? ({value: 0, port: matches[1]}) : false)',
       'output:init': {'port:def': t['output_port:def'], 'value:def': t['relay:def']},
@@ -70,69 +71,98 @@ def entry_install(installer_entry, entry, conf):
       'topic': '/^' + base_topic + t['relay_name'] + '/([0-9]+)/status$/',
       'description': _('Current full output status of the relay'),
       'type': 'object',
-      'notify': _("Shelly device '{caption}' relay #{matches[1]} full state is: {payload}"),
-      'notify_level': 'debug',
+      'notify_level': 'debug', 'notify': _("Shelly device '{caption}' relay #{matches[1]} full state is: {payload}"),
       'events': {
         'output': 'js:({value: payload["ison"] ? 1 : 0, intensity: payload["brightness"], port: matches[1]})',
         'output:init': {'port:def': t['output_port:def'], 'value:def': t['relay:def'], 'intensity:def': 'int', 'intensity:def:limits': [1, 100] },
       },
     }
-  definition_extra['publish']['input'] = {
-    'topic': '/^' + base_topic + 'input/([0-9]+)$/',
-    'description': _('Status of the input pin of the device'),
-    'type': 'int',
-    'payload': {
+  if 'input:def' in t:
+    definition_extra['publish']['input'] = {
+      'topic': '/^' + base_topic + 'input/([0-9]+)$/',
+      'description': _('Status of the input pin of the device'),
+      'type': 'int',
       'payload': {
-        0: { 'caption': 'off' },
-        1: { 'caption': 'ON' },
+        'payload': {
+          0: { 'caption': 'off' },
+          1: { 'caption': 'ON' },
+        },
       },
-    },
-    'notify': _("Shelly device '{caption}' input #{matches[1]} state is: {_[payload!caption]}"),
-    'notify_level': 'debug',
-    'events': {
-      'input': 'js:({value: parseInt(payload), port: matches[1], channel: "singlepush"})',
-      'input:init': {'port:def': t['input_port:def'], 'value:def': t['input:def'], 'channel:def': ['singlepush', 'longpush']},
+      'notify_level': 'debug', 'notify': _("Shelly device '{caption}' input #{matches[1]} state is: {_[payload!caption]}"),
+      'events': {
+        'input': 'js:({value: parseInt(payload), port: matches[1], channel: "singlepush"})',
+        'input:init': {'port:def': t['input_port:def'], 'value:def': t['input:def'], 'channel:def': ['singlepush', 'longpush']},
+      }
     }
-  }
-  definition_extra['publish']['longpush'] = {
-    'topic': '/^' + base_topic + 'longpush/([0-9]+)$/',
-    'description': _('Detects if input pin of the device is in longpush state'),
-    'type': 'int',
-    'payload': {
+    definition_extra['publish']['longpush'] = {
+      'topic': '/^' + base_topic + 'longpush/([0-9]+)$/',
+      'description': _('Detects if input pin of the device is in longpush state'),
+      'type': 'int',
       'payload': {
-        0: { 'caption': 'off' },
-        1: { 'caption': 'ON' },
+        'payload': {
+          0: { 'caption': 'off' },
+          1: { 'caption': 'ON' },
+        },
       },
-    },
-    'notify': _("Shelly device '{caption}' input #{matches[1]} longpush state is: {_[payload!caption]}"),
-    'notify_level': 'debug',
-    'events': {
-      'input': 'js:({value: parseInt(payload), port: matches[1], channel: "longpush"})',
-      'input:init': {'port:def': t['input_port:def'], 'value:def': t['input:def'], 'channel:def': ['singlepush', 'longpush']},
+      'notify_level': 'debug', 'notify': _("Shelly device '{caption}' input #{matches[1]} longpush state is: {_[payload!caption]}"),
+      'events': {
+        'input': 'js:({value: parseInt(payload), port: matches[1], channel: "longpush"})',
+        'input:init': {'port:def': t['input_port:def'], 'value:def': t['input:def'], 'channel:def': ['singlepush', 'longpush']},
+      }
     }
-  }
-  definition_extra['publish']['power'] = {
-    'topic': '/^' + base_topic + t['relay_name'] + '/(([0-9]+)/)?power$/', # shellyswitch usare "relay/power" e non "relay/X/power". In questo caso lo assegno alla porta "0"
-    'description': _('Power consumption of the device in watts'),
-    'type': 'float',
-    'notify': _("Shelly device '{caption}' relay #{matches[1]} power consumption is: {_[payload]}W"),
-    'notify_level': 'debug',
-    'events': {
-      'energy': 'js:({power: parseFloat(payload), port: matches[1] ? matches[2] : "0"})',
-      'energy:init': {'power:def': 'float', 'power:unit': 'W', 'port:def': t['output_port:def']},
+  if not 'emeter_port:def' in t:
+    definition_extra['publish']['power'] = {
+      'topic': '/^' + base_topic + t['relay_name'] + '/(([0-9]+)/)?power$/', # shellyswitch usare "relay/power" e non "relay/X/power". In questo caso lo assegno alla porta "0"
+      'description': _('Power consumption of the device in watts'),
+      'type': 'float',
+      'notify_level': 'debug', 'notify': _("Shelly device '{caption}' relay #{matches[1]} power consumption is: {_[payload]}W"),
+      'events': {
+        'energy': 'js:({power: parseFloat(payload), port: matches[1] ? matches[2] : "0"})',
+        'energy:init': {'power:def': 'float', 'power:unit': 'W', 'port:def': t['output_port:def']},
+      }
     }
-  }
-  definition_extra['publish']['energy'] = {
-    'topic': '/^' + base_topic + t['relay_name'] + '/(([0-9]+)/)?energy$/',
-    'description': _('Energy consumed by the device in watt*min'),
-    'type': 'float',
-    'notify': _("Shelly device '{caption}' relay #{matches[1]} energy consumed is: {_[payload]}Wmin"),
-    'notify_level': 'debug',
-    'events': {
-      'energy': 'js:({energy: parseFloat(payload) / 60000, energy_reported: parseFloat(payload), port: matches[1] ? matches[2] : "0"})',
-      'energy:init': {'energy:def': 'float', 'energy:unit': 'kWh', 'energy_reported:def': 'float', 'energy_reported:unit': 'Wmin'},
+    definition_extra['publish']['energy'] = {
+      'topic': '/^' + base_topic + t['relay_name'] + '/(([0-9]+)/)?energy$/',
+      'description': _('Energy consumed by the device in watt*min'),
+      'type': 'float',
+      'notify_level': 'debug', 'notify': _("Shelly device '{caption}' relay #{matches[1]} energy consumed is: {_[payload]}Wmin"),
+      'events': {
+        'energy': 'js:({energy: parseFloat(payload) / 60000, energy_reported: parseFloat(payload), port: matches[1] ? matches[2] : "0"})',
+        'energy:init': {'energy:def': 'float', 'energy:unit': 'kWh', 'energy_reported:def': 'float', 'energy_reported:unit': 'Wmin'},
+      }
     }
-  }
+  else:
+    definition_extra['publish']['power'] = {
+      'topic': '/^' + base_topic + 'emeter/(([0-9]+)/)?power$/', # shellyswitch usare "relay/power" e non "relay/X/power". In questo caso lo assegno alla porta "0"
+      'description': _('Instantaneous active power in Watts'),
+      'type': 'float',
+      'notify_level': 'debug', 'notify': _("Shelly device '{caption}' emeter #{matches[1]} power detected is: {_[payload]}W"),
+      'events': {
+        'energy': 'js:({power: parseFloat(payload), port: matches[1] ? matches[2] : "0"})',
+        'energy:init': {'power:def': 'float', 'power:unit': 'W', 'port:def': t['output_port:def']},
+      }
+    }
+    definition_extra['publish']['total'] = {
+      'topic': '/^' + base_topic + 'emeter/(([0-9]+)/)?total/',
+      'description': _('Total energy in Wh'),
+      'type': 'float',
+      'notify_level': 'debug', 'notify': _("Shelly device '{caption}' emeter #{matches[1]} energy detected is: {_[payload]}Wh"),
+      'events': {
+        'energy': 'js:({energy: parseFloat(payload) / 1000, energy_reported: parseFloat(payload), port: matches[1] ? matches[2] : "0"})',
+        'energy:init': {'energy:def': 'float', 'energy:unit': 'kWh', 'energy_reported:def': 'float', 'energy_reported:unit': 'Wh'},
+      }
+    }
+    definition_extra['publish']['total_returned'] = {
+      'topic': '/^' + base_topic + 'emeter/(([0-9]+)/)?total_returned/',
+      'description': _('Total energy returned to the grid in Wh'),
+      'type': 'float',
+      'notify_level': 'debug', 'notify': _("Shelly device '{caption}' relay #{matches[1]} returned energy detected is: {_[payload]}Wh"),
+      'events': {
+        'energy': 'js:({energy_returned: parseFloat(payload) / 1000, energy_returned_reported: parseFloat(payload), port: matches[1] ? matches[2] : "0"})',
+        'energy:init': {'energy_returned:def': 'float', 'energy_returned:unit': 'kWh', 'energy_returned_reported:def': 'float', 'energy_returned_reported:unit': 'Wh'},
+      }
+    }
+
   definition_extra['publish']['lwt'] = {
     'topic': '/^' + base_topic + 'online$/',
     'description': _('Connection status of the device (LWT)'),
@@ -143,8 +173,7 @@ def entry_install(installer_entry, entry, conf):
         'false': { 'caption': 'OFFLINE' },
       },
     },
-    'notify': _("Shelly device '{caption}' is: {_[payload|caption]}W"),
-    'notify_level': 'debug',
+    'notify_level': 'debug', 'notify': _("Shelly device '{caption}' is: {_[payload|caption]}W"),
     'events': {
       'connected': 'js:({value: payload == "true"})',
     }
