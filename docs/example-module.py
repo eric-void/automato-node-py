@@ -192,6 +192,8 @@ definition = {
         "eventname:keys": [ "port", "channel"], # Le chiavi da usare per discriminare gli eventi (e la sua cache), da usare al posto di "event_keys" di entry (o globale). WARN: Se vengono dichiarati più ":keys" per lo stesso eventname, ne verrà considerato solo uno (di solito l'ultimo)
         "eventname:init": { "unit": "W" }, # Inizializzazione per gli stati, fatta a caricamento dell'entry. WARN: Se vengono dichiarati più ":init" per lo stesso eventname, ne verrà considerato solo uno (di solito l'ultimo)
         "eventname:init": [{ "port": "0", "unit": "W" }, { "port": "1", "unit": "J"}], # Inizializzazione per gli stati, con "event_keys" diversi
+        "eventname:group": 1, # Numero di secondi di raggruppamento: se impostato, l'evento non viene generato subito ma si uniscono tutti gli eventi uguali che occorrono entro i secondi specificati. L'evento verrà poi emesso (senza alcun messaggio correlato) dopo X tempo.
+          # WARN: Attivare questo sistema introduce un ritardo negli eventi di X secondi. Inoltre i PublishedMessage che vengono generati non avranno l'evento associato.
       },
       
       # [L.2] Esegue questo publish quando viene emesso l'evento specificato
@@ -282,6 +284,16 @@ definition = {
     '@/data': {},
     
     'lambda': { 'handler': _on_subscribed_message_def(local_variable) }, # Esempio di lambda-function (per passare una variabile alla chiamata interna)
+  },
+  
+  # [L.0] Serve solo per le ":meta-dichiarazioni" degli eventi, per avere un posto unico per entry per dichiararle
+  "events": {
+    "eventname:keys": [...], # Vedi sopra
+    "eventname:init": {...}, # Vedi sopra
+    "eventname:group": 1, # Vedi sopra
+  },
+  "actions": {
+    "actionname:init": {...} # Vedi sopra
   },
 
   # TODO [L.0]
