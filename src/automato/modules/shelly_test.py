@@ -13,7 +13,8 @@ def test_init():
         "device_type": "shelly2",
         "shelly_id": "XXXXXX",
 
-        "events_listen": [".output", ".input", ".connected", ".temperature", ".humidity", ".energy", ".clock"]
+        "events_listen": [".output", ".input", ".connected", ".temperature", ".humidity", ".energy", ".clock"],
+        "events": { "energy:group": 0 }, # Disable event grouping for simple testing
       },
       {
         "caption": "Toggle test",
@@ -26,7 +27,8 @@ def test_init():
         "device_type": "shellydimmer",
         "shelly_id": "YYYYYY",
 
-        "events_listen": [".output", ".input", ".connected", ".temperature", ".humidity", ".energy", ".clock"]
+        "events_listen": [".output", ".input", ".connected", ".temperature", ".humidity", ".energy", ".clock"],
+        "events": { "energy:group": 0 }, # Disable event grouping for simple testing
       },
     ],
   })

@@ -45,7 +45,7 @@ def entry_install(installer_entry, entry, conf):
   t = {x: y for x, y in { **default_def, **device_types[device_type] }.items() if y is not None}
   base_topic = 'shellies/' + device_type + '-' + conf['id'] + '/'
   # @see https://shelly-api-docs.shelly.cloud/#mqtt-support http://shelly-api-docs.shelly.cloud/#shelly1-mqtt http://shelly-api-docs.shelly.cloud/#shelly2-mqtt
-  definition_extra = { 'publish': {}, 'subscribe': {}}
+  definition_extra = { 'publish': {}, 'subscribe': {}, 'events': {}, "actions": {}}
   
   definition_extra['publish']['default'] = { 'topic': base_topic + '#' }
   definition_extra['publish']['output'] = {
@@ -62,10 +62,10 @@ def entry_install(installer_entry, entry, conf):
     'notify_level': 'debug', 'notify': _("Shelly device '{caption}' relay #{matches[1]} state is: {_[payload!caption]}"),
     'events': {
       'output': 'js:payload == "on" ? ({value: 1, port: matches[1]}) : (payload == "off" || payload == "overpower" ? ({value: 0, port: matches[1]}) : false)',
-      'output:init': {'port:def': t['output_port:def'], 'value:def': t['relay:def']},
     },
     'check_interval': '1m',
   }
+  definition_extra['events']['output:init'] = {'port:def': t['output_port:def'], 'value:def': t['relay:def']}
   if t['relay_name'] == 'light': # Used by dinner
     definition_extra['publish']['output-status'] = {
       'topic': '/^' + base_topic + t['relay_name'] + '/([0-9]+)/status$/',
@@ -74,9 +74,10 @@ def entry_install(installer_entry, entry, conf):
       'notify_level': 'debug', 'notify': _("Shelly device '{caption}' relay #{matches[1]} full state is: {payload}"),
       'events': {
         'output': 'js:({value: payload["ison"] ? 1 : 0, intensity: payload["brightness"], port: matches[1]})',
-        'output:init': {'port:def': t['output_port:def'], 'value:def': t['relay:def'], 'intensity:def': 'int', 'intensity:def:limits': [1, 100] },
       },
     }
+    definition_extra['events']['output:init'] = {'port:def': t['output_port:def'], 'value:def': t['relay:def'], 'intensity:def': 'int', 'intensity:def:limits': [1, 100] }
+
   if 'input:def' in t:
     definition_extra['publish']['input'] = {
       'topic': '/^' + base_topic + 'input/([0-9]+)$/',
@@ -91,7 +92,6 @@ def entry_install(installer_entry, entry, conf):
       'notify_level': 'debug', 'notify': _("Shelly device '{caption}' input #{matches[1]} state is: {_[payload!caption]}"),
       'events': {
         'input': 'js:({value: parseInt(payload), port: matches[1], channel: "singlepush"})',
-        'input:init': {'port:def': t['input_port:def'], 'value:def': t['input:def'], 'channel:def': ['singlepush', 'longpush']},
       }
     }
     definition_extra['publish']['longpush'] = {
@@ -107,9 +107,10 @@ def entry_install(installer_entry, entry, conf):
       'notify_level': 'debug', 'notify': _("Shelly device '{caption}' input #{matches[1]} longpush state is: {_[payload!caption]}"),
       'events': {
         'input': 'js:({value: parseInt(payload), port: matches[1], channel: "longpush"})',
-        'input:init': {'port:def': t['input_port:def'], 'value:def': t['input:def'], 'channel:def': ['singlepush', 'longpush']},
       }
     }
+    definition_extra['events']['input:init'] = {'port:def': t['input_port:def'], 'value:def': t['input:def'], 'channel:def': ['singlepush', 'longpush']}
+
   if not 'emeter_port:def' in t:
     definition_extra['publish']['power'] = {
       'topic': '/^' + base_topic + t['relay_name'] + '/(([0-9]+)/)?power$/', # shellyswitch usare "relay/power" e non "relay/X/power". In questo caso lo assegno alla porta "0"
@@ -118,7 +119,6 @@ def entry_install(installer_entry, entry, conf):
       'notify_level': 'debug', 'notify': _("Shelly device '{caption}' relay #{matches[1]} power consumption is: {_[payload]}W"),
       'events': {
         'energy': 'js:({power: parseFloat(payload), port: matches[1] ? matches[2] : "0"})',
-        'energy:init': {'power:def': 'float', 'power:unit': 'W', 'port:def': t['output_port:def']},
       }
     }
     definition_extra['publish']['energy'] = {
@@ -128,9 +128,10 @@ def entry_install(installer_entry, entry, conf):
       'notify_level': 'debug', 'notify': _("Shelly device '{caption}' relay #{matches[1]} energy consumed is: {_[payload]}Wmin"),
       'events': {
         'energy': 'js:({energy: parseFloat(payload) / 60000, energy_reported: parseFloat(payload), port: matches[1] ? matches[2] : "0"})',
-        'energy:init': {'energy:def': 'float', 'energy:unit': 'kWh', 'energy_reported:def': 'float', 'energy_reported:unit': 'Wmin'},
       }
     }
+    definition_extra['events']['energy:init'] = {'energy:def': 'float', 'energy:unit': 'kWh', 'energy_reported:def': 'float', 'energy_reported:unit': 'Wmin', 'power:def': 'float', 'power:unit': 'W', 'port:def': t['output_port:def']}
+    definition_extra['events']['energy:group'] = 1
   else:
     definition_extra['publish']['power'] = {
       'topic': '/^' + base_topic + 'emeter/(([0-9]+)/)?power$/', # shellyswitch usare "relay/power" e non "relay/X/power". In questo caso lo assegno alla porta "0"
@@ -139,7 +140,6 @@ def entry_install(installer_entry, entry, conf):
       'notify_level': 'debug', 'notify': _("Shelly device '{caption}' emeter #{matches[1]} power detected is: {_[payload]}W"),
       'events': {
         'energy': 'js:({power: parseFloat(payload), port: matches[1] ? matches[2] : "0"})',
-        'energy:init': {'power:def': 'float', 'power:unit': 'W', 'port:def': t['output_port:def']},
       }
     }
     definition_extra['publish']['total'] = {
@@ -149,7 +149,6 @@ def entry_install(installer_entry, entry, conf):
       'notify_level': 'debug', 'notify': _("Shelly device '{caption}' emeter #{matches[1]} energy detected is: {_[payload]}Wh"),
       'events': {
         'energy': 'js:({energy: parseFloat(payload) / 1000, energy_reported: parseFloat(payload), port: matches[1] ? matches[2] : "0"})',
-        'energy:init': {'energy:def': 'float', 'energy:unit': 'kWh', 'energy_reported:def': 'float', 'energy_reported:unit': 'Wh'},
       }
     }
     definition_extra['publish']['total_returned'] = {
@@ -159,9 +158,10 @@ def entry_install(installer_entry, entry, conf):
       'notify_level': 'debug', 'notify': _("Shelly device '{caption}' relay #{matches[1]} returned energy detected is: {_[payload]}Wh"),
       'events': {
         'energy': 'js:({energy_returned: parseFloat(payload) / 1000, energy_returned_reported: parseFloat(payload), port: matches[1] ? matches[2] : "0"})',
-        'energy:init': {'energy_returned:def': 'float', 'energy_returned:unit': 'kWh', 'energy_returned_reported:def': 'float', 'energy_returned_reported:unit': 'Wh'},
       }
     }
+    definition_extra['events']['energy:init'] = {'energy:def': 'float', 'energy:unit': 'kWh', 'energy_reported:def': 'float', 'energy_reported:unit': 'Wh', 'energy_returned:def': 'float', 'energy_returned:unit': 'kWh', 'energy_returned_reported:def': 'float', 'energy_returned_reported:unit': 'Wh', 'power:def': 'float', 'power:unit': 'W', 'port:def': t['output_port:def']}
+    definition_extra['events']['energy:group'] = 1
 
   definition_extra['publish']['lwt'] = {
     'topic': '/^' + base_topic + 'online$/',
@@ -179,26 +179,29 @@ def entry_install(installer_entry, entry, conf):
     }
   }
   
-  definition_extra['subscribe']['output-set'] = {
-    'topic': '/^' + base_topic + t['relay_name'] + '/([0-9]+)/command$/',
-    'type': ['on', 'off'],
-    'response': [ base_topic + t['relay_name'] + '/{matches[1]}' ],
-    'actions': {
-      'output-set': { 'topic': 'js:"' + base_topic + 'relay/" + ("port" in params ? params["port"] : "0") + "/command"', 'payload': 'js:params["value"] ? "on" : "off"' },
-      'output-set:init': { 'port:def': t['output_port:def'], 'value:def': t['relay:def'] },
+  if t['relay_name'] != 'light':
+    definition_extra['subscribe']['output-set'] = {
+      'topic': '/^' + base_topic + t['relay_name'] + '/([0-9]+)/command$/',
+      'type': ['on', 'off'],
+      'response': [ base_topic + t['relay_name'] + '/{matches[1]}' ],
+      'actions': {
+        'output-set': { 'topic': 'js:"' + base_topic + 'relay/" + ("port" in params ? params["port"] : "0") + "/command"', 'payload': 'js:params["value"] ? "on" : "off"' },
+      }
     }
-  } if t['relay_name'] != 'light' else {
-    'topic': '/^' + base_topic + t['relay_name'] + '/([0-9]+)/set$/',
-    'type': 'object',
-    'response': [ base_topic + t['relay_name'] + '/{matches[1]}/status' ],
-    'actions': {
-      'output-set': { 
-        'topic': 'js:"' + base_topic + t['relay_name'] + '/" + ("port" in params ? params["port"] : "0") + "/set"', 
-        'payload': 'js:let payload = {}; if ("value" in params) payload.turn = params["value"] ? "on" : "off"; if ("intensity" in params) payload.brightness = params["intensity"]; payload'
-      },
-      'output-set:init': { 'port:def': t['output_port:def'], 'value:def': t['relay:def'], 'intensity:def': 'int', 'intensity:def:limits': [1, 100] },
+    definition_extra['actions']['output-set:init'] = { 'port:def': t['output_port:def'], 'value:def': t['relay:def'] }
+  else:
+    definition_extra['subscribe']['output-set'] = {
+      'topic': '/^' + base_topic + t['relay_name'] + '/([0-9]+)/set$/',
+      'type': 'object',
+      'response': [ base_topic + t['relay_name'] + '/{matches[1]}/status' ],
+      'actions': {
+        'output-set': { 
+          'topic': 'js:"' + base_topic + t['relay_name'] + '/" + ("port" in params ? params["port"] : "0") + "/set"', 
+          'payload': 'js:let payload = {}; if ("value" in params) payload.turn = params["value"] ? "on" : "off"; if ("intensity" in params) payload.brightness = params["intensity"]; payload'
+        },
+      }
     }
-  }
+    definition_extra['actions']['output-set:init'] = { 'port:def': t['output_port:def'], 'value:def': t['relay:def'], 'intensity:def': 'int', 'intensity:def:limits': [1, 100] }
 
   system.entry_definition_add_default(entry, definition_extra);
 
