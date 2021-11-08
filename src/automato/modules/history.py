@@ -55,7 +55,7 @@ def run(entry):
             if file_suffix == entry.history_last_file_suffix:
               t = d[0]
             if t == '#' or d[1]['changed_params']:
-              lines.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f') + '\t' + eventname + '\t' + utils.json_export(d[1]['keys']) + '\t' + t + utils.json_export({x: d[1]['params'][x] for x in d[1]['params'] if x not in d[1]['keys']} if t == '#' else d[1]['changed_params']))
+              lines.append(utils.strftime(d['time'], '%Y-%m-%d %H:%M:%S.%f') + '\t' + eventname + '\t' + utils.json_export(d[1]['keys']) + '\t' + t + utils.json_export({x: d[1]['params'][x] for x in d[1]['params'] if x not in d[1]['keys']} if t == '#' else d[1]['changed_params']))
             t = ''
           entry.history_event_buffer[entry_id][eventname][k] = []
     
