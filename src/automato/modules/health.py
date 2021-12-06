@@ -209,7 +209,8 @@ def _health_checker_timer(entry):
     elif health_disable_load_level > 0 and node.load_level() == 0 and now - health_disable_load_level > 60:
       health_disable_load_level = 0
       # if a moment ago the system was too load, and now is ok, i must consider health_dead_checker and health_publish_checker data as invalid and reset them (or i'll report a lot of fake health problems)
-      
+    
+    if health_disable_load_level > 0:
       # health_dead_checker
       for entry_id in entry.health_dead_checker:
         source_entry = system.entry_get(entry_id)
@@ -221,7 +222,7 @@ def _health_checker_timer(entry):
         for e in entry.health_publish_checker[t]:
           entry.health_publish_checker[t][e]['last_published'] = system.time()
     
-    if health_disable_load_level == 0:
+    else:
       # health_dead_checker
       timeouts = [ entry_id for entry_id in entry.health_dead_checker if now > entry.health_dead_checker[entry_id][0] ]
       if timeouts:
