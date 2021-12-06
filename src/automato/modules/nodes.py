@@ -142,10 +142,10 @@ def run(entry):
     dead = [node for node in entry.data['seen'] if node != system.default_node_name and t - entry.data['seen'][node]['his_time'] > utils.read_duration(entry.config['dead_time'])]
     if dead:
       for node in dead:
+        entry.publish('./dead-node', { 'name': node, 'last_seen': entry.data['seen'][node]['his_time'], 'time': t })
         system.entry_unload_node_entries(node)
         del entry.data['seen'][node]
         del entry.data['nodes'][node]
-        entry.publish('./dead-node', { 'name': node, 'last_seen': entry.data['seen'][node]['his_time'], 'time': t })
       #entry.data['seen'] = {node:v for node,v in entry.data['seen'].items() if t - entry.data['seen'][node]['his_time'] <= utils.read_duration(entry.config['dead_time'])}
       publish_metadata(entry, entry.topic('./metadata'))
         
