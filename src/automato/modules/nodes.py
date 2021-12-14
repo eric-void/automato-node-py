@@ -29,7 +29,7 @@ definition = {
     './dead-node': {
       'description': _('Detected a non-responding node, it will be considered as dead for next metadata broadcast'),
       'type': 'object',
-      'notify_level': 'info',
+      'notify_level': 'critical',
       'notify': _('Automato node "{payload[name]}" is dead, last seen at {payload[last_seen!strftime(%Y-%m-%d %H:%M:%S)]}'),
     }
   },
