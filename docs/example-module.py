@@ -153,11 +153,11 @@ definition = {
         'payload': { ... } # In caso di payload a singolo valore
       },
       # Trasforma il payload usato da notifiche e eventi
-      'payload_transform': 'js:if ("StatusSNS" in payload) payload = payload["StatusSNS"]; payload["Data"] = {}; for (k in payload) { if (payload[k] && typeof payload[k] == "object" && !(payload[k] instanceof Array)) { for (x in payload[k]) payload["Data"][x] = payload[k][x]; payload["SensorType"] = k } }; payload',
+      'payload_transform': 'jsf:if ("StatusSNS" in payload) payload = payload["StatusSNS"]; payload["Data"] = {}; for (k in payload) { if (payload[k] && typeof payload[k] == "object" && !(payload[k] instanceof Array)) { for (x in payload[k]) payload["Data"][x] = payload[k][x]; payload["SensorType"] = k } }; return payload',
       
       'notify': 'Temperatura interna di {caption}: {payload[temperature]}° (umidità: {payload[humidity!caption]}%), ora: {payload[time!strftime(%Y-%m-%d %H:%M:%S)]}' # Stringa in formato ".format", dove {payload} contiene il payload, {caption} il nome e {matches} l'array di eventuali match del topic. @see https://docs.python.org/3/library/string.html#format-string-syntax
       'notify': _('Current time is {_[payload!strftime(%Y-%m-%d %H:%M:%S)]}'), # Esempio in caso di valore diretto da formattare con strftime
-      'notify_handler': 'js:let output = '';[...];(output + ".")', # Chiama il metodo specificato, con i parametri "def as_string(entry, topic, payload):" (payload se è un dict è wrappato da PayloadDict, che supporta i formattatori)
+      'notify_handler': 'jsf:let output = '';[...]; return output + "."', # Chiama il metodo specificato, con i parametri "def as_string(entry, topic, payload):" (payload se è un dict è wrappato da PayloadDict, che supporta i formattatori)
       'notify_type': '', # Se specificato, usa questo invece di metadata['notify_type'] 
       'notify_level': '', # Se specificato, usa questo invece di metadata['notify_level'] 
       'notify_change_level': '', # Usa questo livello se il payload del topic cambia rispetto al precedente
@@ -187,7 +187,7 @@ definition = {
         "state": "js:({value: payload['value'] == 'on' ? 1 : 0, value2: 0 + payload['value2']})",
         "clock": "js:({value: parseInt(payload['time'])})",
         "location": "js:(payload['_type'] == 'location' ? {latitude: payload['lat'], longitude: payload['lon'], altitude: payload['alt'], radius: payload['acc'], radius:unit: 'm', regions: 'inregions' in payload ? payload['inregions'] : [], source: 'owntracks'} : null)",
-        "test": 'js:let payload = {}; if ("value" in params) payload.turn = params["value"] ? "on" : "off"; if ("intensity" in params) payload.brightness = params["intensity"]; payload',
+        "test": 'jsf:let payload = {}; if ("value" in params) payload.turn = params["value"] ? "on" : "off"; if ("intensity" in params) payload.brightness = params["intensity"]; return payload',
         "eventname": ["js:...", "js:..."], # Se è possibile invocare più eventi con lo stesso nome è possibile specificare un array di definizioni
         "eventname:keys": [ "port", "channel"], # Le chiavi da usare per discriminare gli eventi (e la sua cache), da usare al posto di "event_keys" di entry (o globale). WARN: Se vengono dichiarati più ":keys" per lo stesso eventname, ne verrà considerato solo uno (di solito l'ultimo)
         "eventname:init": { "unit": "W" }, # Inizializzazione per gli stati, fatta a caricamento dell'entry. WARN: Se vengono dichiarati più ":init" per lo stesso eventname, ne verrà considerato solo uno (di solito l'ultimo)

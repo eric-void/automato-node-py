@@ -108,7 +108,7 @@ def entry_install(installer_entry, entry, conf):
         'type': 'object',
         'notify': _("Tasmota device '{caption}' reports sensor {payload[SensorType]} data: {payload[Data]}"),
         'notify_level': 'debug',
-        'payload_transform': 'js:if ("StatusSNS" in payload) payload = payload["StatusSNS"]; payload["Data"] = {}; for (k in payload) { if (payload[k] && k != "Data" && is_dict(payload[k])) { for (x in payload[k]) payload["Data"][x] = payload[k][x]; payload["SensorType"] = k } }; payload',
+        'payload_transform': 'jsf:if ("StatusSNS" in payload) payload = payload["StatusSNS"]; payload["Data"] = {}; for (k in payload) { if (payload[k] && k != "Data" && is_dict(payload[k])) { for (x in payload[k]) payload["Data"][x] = payload[k][x]; payload["SensorType"] = k } }; return payload',
         #'_payload_transform': 'js:payload',
         'events': {
           'temperature': 'js:"Temperature" in payload["Data"] && "TempUnit" in payload ? { "value": parseFloat(payload["Data"]["Temperature"]), "value:unit": "°" + payload["TempUnit"] } : null',

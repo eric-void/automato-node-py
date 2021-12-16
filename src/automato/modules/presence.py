@@ -30,10 +30,10 @@ definition = {
     './presence': {
       'type': 'object',
       'description': _('List people connected to local wi-fi'),
-      'notify_handler': 'js:' +
+      'notify_handler': 'jsf:' +
         'let output = "";' +
         'for (name in payload["occupants"]) output += (output ? ", " :  "") + _(name + " since " + strftime(payload["occupants"][name]["firstseen"], "%H:%M:%S"));' +
-        '(output ? _("People detected:") + " " + output : _("No people detected"));',
+        'return output ? _("People detected:") + " " + output : _("No people detected");',
       'run_interval': 15,
       'handler': 'publish',
       'notify_level': 'debug',

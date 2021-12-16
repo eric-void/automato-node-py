@@ -197,7 +197,7 @@ def entry_install(installer_entry, entry, conf):
       'actions': {
         'output-set': { 
           'topic': 'js:"' + base_topic + t['relay_name'] + '/" + ("port" in params ? params["port"] : "0") + "/set"', 
-          'payload': 'js:let payload = {}; if ("value" in params) payload.turn = params["value"] ? "on" : "off"; if ("intensity" in params) payload.brightness = params["intensity"]; payload'
+          'payload': 'jsf:let payload = {}; if ("value" in params) payload.turn = params["value"] ? "on" : "off"; if ("intensity" in params) payload.brightness = params["intensity"]; return payload'
         },
       }
     }
