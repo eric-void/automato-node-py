@@ -92,7 +92,7 @@ definition = {
       'run_interval': 30,
       'handler': 'publish',
       'notify_level': 'debug',
-      'events_debug' : 2,
+      #'events_debug' : 2,
       'events': {
         "stats": "js:payload_transfer({'port': 'inverter'}, payload, ['c_manufacturer', 'c_model', 'c_version', 'c_serialnumber', 'c_deviceaddress', 'c_sunspec_did', 'status', 'vendor_status', 'rrcr_state', 'active_power_limit', 'cosphi'])",
         "energy": [
@@ -107,7 +107,7 @@ definition = {
       'description': _('Report data from meter connected to solaredge inverter'),
       'notify_level': 'debug',
       # TODO Mancano le fasi p1, p2, p3
-      'events_debug' : 2,
+      #'events_debug' : 2,
       'events': {
         "stats": "js:payload_transfer({'port': matches[1]}, payload, ['c_manufacturer', 'c_model', 'c_option', 'c_version', 'c_serialnumber', 'c_deviceaddress', 'c_sunspec_did'])",
         "energy": [
@@ -121,7 +121,7 @@ definition = {
       'type': 'object',
       'description': _('Report data from battery connected to solaredge inverter'),
       'notify_level': 'debug',
-      'events_debug' : 2,
+      #'events_debug' : 2,
       'events': {
         "stats": "js:payload_transfer({'port': matches[1]}, payload, ['c_manufacturer', 'c_model', 'c_version', 'c_serialnumber', 'c_deviceaddress', 'c_sunspec_did', 'status', 'status_internal', 'event_log', 'event_log_internal'])",
         "temperature": "js:payload_transfer({'port': matches[1]}, payload, {'average_temperature': 'value', 'maximum_temperature': 'max'})",
