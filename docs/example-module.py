@@ -130,6 +130,9 @@ definition = {
     "property": ('in', ["val1", "val2"]), # To see full () rules, look at system._entry_install_on_match()
   },
   
+  "ignore": True, # Se attivato, qualunque messaggio in ingresso associato a un published message verrà ignorato (non sarà generato il PublishedMessage e i suoi eventi). I subscribe verranno invece processati come di norma.
+  "ignore_interval": "1m", # Un messaggio associato a un published message verrà elaborato (generando PublishedMessage e i suoi eventi) solo se è passato almeno il tempo specificato dal messaggio dello stesso topic rule procedente. Il messaggio viene identificato dal suo topic (se 2 topic matchano lo stesso publish, comunque hanno 2 intervalli diversi)
+  
   # [L.0]
   'publish': {
     # Elenco di topic_rule da matchare. Ogni messaggio in ingresso verrà associato a un solo topic_rule. Se ci sono più match, verrà scelto quello con più alto "topic_match_priority", o uno a caso in caso di equivalenza.
@@ -181,6 +184,9 @@ definition = {
       'script': [ 'py:', 'if x:', '  pass' ]
       'script': [ 'py:', 'if x:', [ 'pass' ] ]
       
+      "ignore": True, # Se attivato, qualunque messaggio in ingresso associato a un published message verrà ignorato (non sarà generato il PublishedMessage e i suoi eventi). I subscribe verranno invece processati come di norma.
+      "ignore_interval": "1m", # Un messaggio associato a un published message verrà elaborato (generando PublishedMessage e i suoi eventi) solo se è passato almeno il tempo specificato dal messaggio dello stesso topic rule procedente. Il messaggio viene identificato dal suo topic (se 2 topic matchano lo stesso publish, comunque hanno 2 intervalli diversi)
+
       # [L.0] Dichiarazioni eventi
       # WARN: il risultato delle esecuzioni di codice degli eventi può essere messo in cache, e quindi è importante che il codice sia DETERMINISTICO rispetto ai parametri: se do gli stessi parametri 2 volte, il codice deve dare lo stesso risultato!
       "events": { # Variabili a disposizione di definizione: {topic}, {payload}, {matches}
