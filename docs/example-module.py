@@ -337,6 +337,7 @@ definition = {
   "methods": {
     "init": [ "print(entry.id)" ], # parametri: (entry, *args, **kwargs)
     "start": [ "print(entry.id)" ], # parametri: (entry, *args, **kwargs)
+    "run": [ "print(entry.id)" ], # parametri: (entry, *args, **kwargs)
     "...": [ "print(args[0].id)" ], # parametri: (*args, **kwargs)
   },
 
