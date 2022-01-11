@@ -16,7 +16,7 @@ definition = {
   'config': {
     "solaredge_modbus_tcp_host": "192.168.1.1",
     "solaredge_modbus_tcp_port": 1502,
-    "solaredge_modbus_tcp_timeout": 1,
+    "solaredge_modbus_tcp_timeout": 2,
     "solaredge_modbus_tcp_unit": 1,
     "solaredge_modbus_tcp_data_filter": {
       "inverter": [
@@ -90,6 +90,7 @@ definition = {
       'type': 'object',
       'description': _('Report data from solaredge inverter'),
       'run_interval': 30,
+      'check_interval': '5m',
       'handler': 'publish',
       'notify_level': 'debug',
       #'events_debug' : 2,
@@ -150,6 +151,8 @@ def publish(entry, topic, definition):
     
     inverter_data = {}
     values = inverter.read_all()
+    if "c_serialnumber" in values:
+      inverter_data["c_serialnumber"] = values["c_serialnumber"]
     for k, v in values.items():
       if not entry.config['solaredge_modbus_tcp_data_filter'] or ("inverter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["inverter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["inverter"]:
         if (isinstance(v, int) or isinstance(v, float)) and "_scale" not in k:
@@ -172,6 +175,8 @@ def publish(entry, topic, definition):
       meter = meter.lower()
       meter_data[meter] = {}
       values = params.read_all()
+      if "c_serialnumber" in values:
+        meter_data[meter]["c_serialnumber"] = values["c_serialnumber"]
       for k, v in values.items():
         if not entry.config['solaredge_modbus_tcp_data_filter'] or ("meter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["meter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["meter"]:
           if (isinstance(v, int) or isinstance(v, float)) and "_scale" not in k:
@@ -194,6 +199,8 @@ def publish(entry, topic, definition):
       battery = battery.lower()
       battery_data[battery] = {}
       values = params.read_all()
+      if "c_serialnumber" in values:
+        battery_data[battery]["c_serialnumber"] = values["c_serialnumber"]
       for k, v in values.items():
         if not entry.config['solaredge_modbus_tcp_data_filter'] or ("battery" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["battery"] or k in entry.config['solaredge_modbus_tcp_data_filter']["battery"]:
           if (isinstance(v, int) or isinstance(v, float)) and "_scale" not in k:
