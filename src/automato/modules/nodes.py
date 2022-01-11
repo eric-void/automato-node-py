@@ -23,7 +23,7 @@ definition = {
       'description': _('System metadata built by an automato node (by merging local metadata with other nodes metadata)'),
       'type': 'object',
       'run_interval': '30m', # Sends metadata every 30 minutes. So other nodes, if don't see this node metadata after 30 minutes, could consider this as a dead node
-      'run_trottle': 'force',
+      'run_throttle': 'force',
       'handler': 'publish_metadata',
     },
     './dead-node': {
