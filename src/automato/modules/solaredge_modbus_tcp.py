@@ -153,21 +153,23 @@ def publish(entry, topic, definition):
     values = inverter.read_all()
     if "c_serialnumber" in values:
       inverter_data["c_serialnumber"] = values["c_serialnumber"]
-    for k, v in values.items():
-      if not entry.config['solaredge_modbus_tcp_data_filter'] or ("inverter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["inverter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["inverter"]:
-        if (isinstance(v, int) or isinstance(v, float)) and "_scale" not in k:
-          k_split = k.split("_")
-          scale = 0
-          if f"{k_split[len(k_split) - 1]}_scale" in values:
-            scale = values[f"{k_split[len(k_split) - 1]}_scale"]
-          elif f"{k}_scale" in values:
-            scale = values[f"{k}_scale"]
+    filtered = values["energy_total"] == 0 and values["temperature"] == 0
+    if not filtered:
+      for k, v in values.items():
+        if not entry.config['solaredge_modbus_tcp_data_filter'] or ("inverter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["inverter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["inverter"]:
+          if (isinstance(v, int) or isinstance(v, float)) and "_scale" not in k:
+            k_split = k.split("_")
+            scale = 0
+            if f"{k_split[len(k_split) - 1]}_scale" in values:
+              scale = values[f"{k_split[len(k_split) - 1]}_scale"]
+            elif f"{k}_scale" in values:
+              scale = values[f"{k}_scale"]
 
-          inverter_data.update({k: float(v * (10 ** scale))})
-        elif "_scale" not in k:
-          inverter_data.update({k: v})
-    if (inverter_data):
-      entry.publish('./inverter', inverter_data)
+            inverter_data.update({k: float(v * (10 ** scale))})
+          elif "_scale" not in k:
+            inverter_data.update({k: v})
+      if (inverter_data):
+        entry.publish('./inverter', inverter_data)
 
     meter_data = {}
     meters = inverter.meters()
