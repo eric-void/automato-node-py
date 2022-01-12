@@ -11,3 +11,5 @@
 #-r src/automato/modules/rf_listener-requirements.txt
 -r src/automato/modules/speedtest-requirements.txt
 -r src/automato/modules/telegram2-requirements.txt
+-r src/automato/modules/influxdb-requirements.txt
+-r src/automato/modules/solaredge_modbus_tcp-requirements.txt
