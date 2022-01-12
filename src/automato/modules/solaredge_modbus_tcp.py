@@ -136,6 +136,9 @@ definition = {
   }
 }
 
+def _float_is_zero(v):
+  return v >= -0.0000001 and v <= 0.0000001
+
 def init(entry):
   l = logging.getLogger('pymodbus')
   l.propagate = False
@@ -151,10 +154,10 @@ def publish(entry, topic, definition):
     
     inverter_data = {}
     values = inverter.read_all()
-    if "c_serialnumber" in values:
-      inverter_data["c_serialnumber"] = values["c_serialnumber"]
-    filtered = values["energy_total"] == 0 and values["temperature"] == 0
+    filtered = "energy_total" not in values or "temperature" not in values or (_float_is_zero(values["energy_total"]) and _float_is_zero(values["temperature"]))
     if not filtered:
+      if "c_serialnumber" in values:
+        inverter_data["c_serialnumber"] = values["c_serialnumber"]
       for k, v in values.items():
         if not entry.config['solaredge_modbus_tcp_data_filter'] or ("inverter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["inverter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["inverter"]:
           if (isinstance(v, int) or isinstance(v, float)) and "_scale" not in k:
@@ -177,23 +180,25 @@ def publish(entry, topic, definition):
       meter = meter.lower()
       meter_data[meter] = {}
       values = params.read_all()
-      if "c_serialnumber" in values:
-        meter_data[meter]["c_serialnumber"] = values["c_serialnumber"]
-      for k, v in values.items():
-        if not entry.config['solaredge_modbus_tcp_data_filter'] or ("meter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["meter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["meter"]:
-          if (isinstance(v, int) or isinstance(v, float)) and "_scale" not in k:
-            k_split = k.split("_")
-            scale = 0
-            if f"{k_split[len(k_split) - 1]}_scale" in values:
-              scale = values[f"{k_split[len(k_split) - 1]}_scale"]
-            elif f"{k}_scale" in values:
-              scale = values[f"{k}_scale"]
+      filtered = "export_energy_active" not in values or "import_energy_active" not in values or "frequency" not in values or (_float_is_zero(values["export_energy_active"]) and _float_is_zero(values["import_energy_active"]) and _float_is_zero(values["frequency"]))
+      if not filtered:
+        if "c_serialnumber" in values:
+          meter_data[meter]["c_serialnumber"] = values["c_serialnumber"]
+        for k, v in values.items():
+          if not entry.config['solaredge_modbus_tcp_data_filter'] or ("meter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["meter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["meter"]:
+            if (isinstance(v, int) or isinstance(v, float)) and "_scale" not in k:
+              k_split = k.split("_")
+              scale = 0
+              if f"{k_split[len(k_split) - 1]}_scale" in values:
+                scale = values[f"{k_split[len(k_split) - 1]}_scale"]
+              elif f"{k}_scale" in values:
+                scale = values[f"{k}_scale"]
 
-            meter_data[meter].update({k: float(v * (10 ** scale))})
-          elif "_scale" not in k:
-            meter_data[meter].update({k: v})
-      if meter_data[meter]:
-        entry.publish('./meter/' + meter, meter_data[meter])
+              meter_data[meter].update({k: float(v * (10 ** scale))})
+            elif "_scale" not in k:
+              meter_data[meter].update({k: v})
+        if meter_data[meter]:
+          entry.publish('./meter/' + meter, meter_data[meter])
 
     battery_data = {}
     batteries = inverter.batteries()
@@ -201,23 +206,25 @@ def publish(entry, topic, definition):
       battery = battery.lower()
       battery_data[battery] = {}
       values = params.read_all()
-      if "c_serialnumber" in values:
-        battery_data[battery]["c_serialnumber"] = values["c_serialnumber"]
-      for k, v in values.items():
-        if not entry.config['solaredge_modbus_tcp_data_filter'] or ("battery" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["battery"] or k in entry.config['solaredge_modbus_tcp_data_filter']["battery"]:
-          if (isinstance(v, int) or isinstance(v, float)) and "_scale" not in k:
-            k_split = k.split("_")
-            scale = 0
-            if f"{k_split[len(k_split) - 1]}_scale" in values:
-              scale = values[f"{k_split[len(k_split) - 1]}_scale"]
-            elif f"{k}_scale" in values:
-              scale = values[f"{k}_scale"]
+      filtered = "lifetime_export_energy_counter" not in values or "lifetime_export_energy_counter" not in values or "instantaneous_voltage" not in values or (_float_is_zero(values["lifetime_export_energy_counter"]) and _float_is_zero(values["lifetime_export_energy_counter"]) and _float_is_zero(values["instantaneous_voltage"]))
+      if not filtered:
+        if "c_serialnumber" in values:
+          battery_data[battery]["c_serialnumber"] = values["c_serialnumber"]
+        for k, v in values.items():
+          if not entry.config['solaredge_modbus_tcp_data_filter'] or ("battery" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["battery"] or k in entry.config['solaredge_modbus_tcp_data_filter']["battery"]:
+            if (isinstance(v, int) or isinstance(v, float)) and "_scale" not in k:
+              k_split = k.split("_")
+              scale = 0
+              if f"{k_split[len(k_split) - 1]}_scale" in values:
+                scale = values[f"{k_split[len(k_split) - 1]}_scale"]
+              elif f"{k}_scale" in values:
+                scale = values[f"{k}_scale"]
 
-            battery_data[battery].update({k: float(v * (10 ** scale))})
-          elif "_scale" not in k:
-            battery_data[battery].update({k: v})
-      if battery_data[battery]:
-        entry.publish('./battery/' + battery, battery_data[battery])
+              battery_data[battery].update({k: float(v * (10 ** scale))})
+            elif "_scale" not in k:
+              battery_data[battery].update({k: v})
+        if battery_data[battery]:
+          entry.publish('./battery/' + battery, battery_data[battery])
 
   except:
     logging.exception("{id}> Exception during inverter data collection...".format(id = entry.id))
