@@ -215,7 +215,7 @@ def _health_checker_timer(entry):
       for entry_id in entry.health_dead_checker:
         source_entry = system.entry_get(entry_id)
         if source_entry:
-          entry.health_dead_checker[entry_id][0] = system.time() + source_entry.health_config_dead_disconnected_timeout
+          entry.health_dead_checker[entry_id] = (system.time() + entry.health_dead_checker[entry_id][1], entry.health_dead_checker[entry_id][1], entry.health_dead_checker[entry_id][2])
 
       # health_publish_checker
       for t in entry.health_publish_checker:
@@ -229,7 +229,7 @@ def _health_checker_timer(entry):
         for entry_id in timeouts:
           source_entry = system.entry_get(entry_id)
           if source_entry:
-            source_entry.health_dead = entry.health_dead_checker[entry_id][1]
+            source_entry.health_dead = entry.health_dead_checker[entry_id][2]
             check_health_status(source_entry)
         entry.health_dead_checker = { entry_id: entry.health_dead_checker[entry_id] for entry_id in entry.health_dead_checker if entry_id not in timeouts }
       
@@ -254,7 +254,7 @@ def event_connected(self_entry, source_entry, eventname, eventdata, caller, publ
       del self_entry.health_dead_checker[source_entry.id]
     check_health_status(source_entry)
   else:
-    self_entry.health_dead_checker[source_entry.id] = (system.time() + source_entry.health_config_dead_disconnected_timeout, 'disconnected for too long')
+    self_entry.health_dead_checker[source_entry.id] = (system.time() + source_entry.health_config_dead_disconnected_timeout, source_entry.health_config_dead_disconnected_timeout, 'disconnected for too long')
 
 def on_subscribe_all_messages(entry, subscribed_message):
   """
@@ -276,7 +276,7 @@ def on_subscribe_all_messages(entry, subscribed_message):
       if firstpm.entry.id != entry.id:
         logging.error("HEALTH> entry {id} has NO health_config_dead_message_timeout".format(id = firstpm.entry.id))
     elif firstpm.entry.health_config_dead_message_timeout:
-      entry.health_dead_checker[firstpm.entry.id] = (system.time() + firstpm.entry.health_config_dead_message_timeout, 'silent for too long')
+      entry.health_dead_checker[firstpm.entry.id] = (system.time() + firstpm.entry.health_config_dead_message_timeout, firstpm.entry.health_config_dead_message_timeout, 'silent for too long')
   
   # Look for entries subscribed to this topic. If a "response" is defined, we will wait for the response to come (or not)
   for sm in message.subscribedMessages():

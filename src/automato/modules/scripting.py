@@ -77,7 +77,7 @@ def entry_load(self_entry, entry):
       script = decode_script(entry.definition['methods'][method])
       #logging.debug("#{id}@scripting> loaded method: {method}\n--------------------\n{script}".format(id = m, method = method, script = script))
       # TODO i method base (chiamati tramite system.entry_invoke) sono in formato (entry, *args, **kwargs). I metodi chiamabili da script sono in formato (*args, **kwargs). Per questo la differenza, ma non è molto elegante cosi'
-      if method in ['init', 'start']:
+      if method in ['init', 'start', 'run']:
         #setattr(entry.module, method, _exec_script_lambda_noentry(script))
         entry.methods[method] = _exec_script_lambda_noentry(script)
       else:

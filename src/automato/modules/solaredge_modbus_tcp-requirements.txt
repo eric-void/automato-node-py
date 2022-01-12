@@ -1,0 +1,3 @@
+# @see https://github.com/nmakel/solaredge_modbus
+# pip3 install solaredge_modbus
+solaredge-modbus >= 0.7.0
