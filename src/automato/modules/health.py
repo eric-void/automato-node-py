@@ -220,7 +220,8 @@ def _health_checker_timer(entry):
       # health_publish_checker
       for t in entry.health_publish_checker:
         for e in entry.health_publish_checker[t]:
-          entry.health_publish_checker[t][e]['last_published'] = system.time()
+          if entry.health_publish_checker[t][e]['last_published'] > 0:
+            entry.health_publish_checker[t][e]['last_published'] = system.time()
     
     else:
       # health_dead_checker
@@ -284,6 +285,13 @@ def on_subscribe_all_messages(entry, subscribed_message):
       system.subscribe_response(sm.entry, subscribed_message.message, callback = on_response_to_subscribed_message, no_response_callback = on_no_response_to_subscribed_message)
   
   # Update publish checker
+  for pm in subscribed_message.message.publishedMessages():
+    if pm.topic_rule in entry.health_publish_checker and pm.entry.id in entry.health_publish_checker[pm.topic_rule]:
+      entry.health_publish_checker[pm.topic_rule][pm.entry.id]['last_published'] = system.time()
+      if pm.entry and pm.topic_rule in pm.entry.health_publish:
+        del pm.entry.health_publish[pm.topic_rule]
+        check_health_status(pm.entry)
+  """
   if subscribed_message.topic in entry.health_publish_checker:
     for e in entry.health_publish_checker[subscribed_message.topic]:
       entry.health_publish_checker[subscribed_message.topic][e]['last_published'] = system.time()
@@ -291,6 +299,7 @@ def on_subscribe_all_messages(entry, subscribed_message):
       if target_entry and subscribed_message.topic in target_entry.health_publish:
         del target_entry.health_publish[subscribed_message.topic]
         check_health_status(target_entry)
+  """
 
 def on_response_to_subscribed_message(entry, id, message, final, response_to_message):
   entry.health_response = ''
