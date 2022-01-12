@@ -113,7 +113,7 @@ definition = {
   # [L.2]
   'run_interval': 30, # Se specificato, richiama il metodo "run(entry)" ogni X secondi
   'run_cron': "*/2 * * * *", # In alternativa a run_interval, specifica ogni quanto avviare il run in base a una regola di cron @see https://en.wikipedia.org/wiki/Cron
-  'run_trottle': "skip", # throttle_policy = "skip" (skip this run) | "wait" (postpone this run when possibile) | "force" (do it - if load level is critical this is turned to "wait") | XXX (wait max this number of seconds). This value can be a list ["policy on high load", "policy on very high load"]
+  'run_throttle': "skip", # throttle_policy = "skip" (skip this run) | "wait" (postpone this run when possibile) | "force" (do it - if load level is critical this is turned to "wait") | XXX (wait max this number of seconds). This value can be a list ["policy on high load", "policy on very high load"]
   
   # [L.2] Gestito da scripting (per ora)
   "data": {
@@ -171,7 +171,7 @@ definition = {
       'run_interval': 30, # Se specificato, richiama il metodo "publish(entry, realtopic, metadata)" ogni X secondi
       'run_cron': "*/2 * * * *", # In alternativa a run_interval, specifica ogni quanto avviare il publish in base a una regola di cron @see https://en.wikipedia.org/wiki/Cron
         # WARN: a differenza di run_interval, run_cron non è verificato dal modulo health. Se viene usato è consigliabile mettere anche un "check_interval" con un tetto massimo di intervallo tra le chiamate
-      'run_trottle': "skip", # throttle_policy = "skip" (skip this run) | "wait" (postpone this run when possibile) | "force" (do it - if load level is critical this is turned to "wait") | XXX (wait max this number of seconds). This value can be a list ["policy on high load", "policy on very high load"]
+      'run_throttle': "skip", # throttle_policy = "skip" (skip this run) | "wait" (postpone this run when possibile) | "force" (do it - if load level is critical this is turned to "wait") | XXX (wait max this number of seconds). This value can be a list ["policy on high load", "policy on very high load"]
       'check_interval': 30, # [health module] Controlla che il publish sia fatto almeno ogni X secondi (moltiplicato per 1.5, @see health). Non c'è bisogno di specificarlo se è già specificato 'run_interval'
       # In caso di "run" (quindi con run_interval o run_cron, oppure chiamata a run_publish, esegue questo handler - E' possibile usare una stringa, nel caso cerca dentro entry.module o entry.methods l'handler con quel nome
       'handler': publish(entry, topic_rule, topic_definition),
