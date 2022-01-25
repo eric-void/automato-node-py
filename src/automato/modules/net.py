@@ -5,6 +5,9 @@ import logging
 import subprocess
 import requests
 import json
+import http.client as httplib
+import os
+import subprocess
 
 from automato.core import system
 from automato.core import utils
@@ -13,6 +16,10 @@ definition = {
   'config': {
     'bandwidth-enabled': False,
     'wan-reconnect-enabled': False,
+    
+    "wan-connected-check-method": "ping", # "ping" to use linux shell command ping, or "http" for a http head connection
+    "wan-connected-check-ip": "8.8.8.8",
+    "wan-connected-check-timeout": 2, # timeout in seconds. Can be a float number
     
     'external-ip-http-service': 'https://api.ipify.org', # Alternative: 'ifconfig.me'
     'wan-ip-detect-method': 'if', # Values: if, snmpwalk-command, module
@@ -75,6 +82,24 @@ definition = {
       'events': {
         'bandwidth': 'js:({"type": "lan", "download": payload["download_bps"], "download:unit": "bps", "upload": payload["upload_bps"], "upload:unit": "bps", "error": payload["error"]})',
         'clock': 'js:({"value": t(payload["time"])})',
+      }
+    },
+    './wan-connected': {
+      'type': 'int',
+      'description': _('Checks if internet connection is on'),
+      'notify': _('Internet connection is {payload}'),
+      'notify_change_level': 'warn',
+      'payload': {
+        'payload': {
+          '0': { 'caption': 'OFF' },
+          '1': { 'caption': 'on' },
+        },
+      },
+      'run_interval': '5m',
+      'run_throttle': 'force',
+      'handler': 'publish_wan_connected',
+      'events': {
+        'connected': 'js:({"value": parseInt(payload), "port": "wan"})',
       }
     }
   },
@@ -144,6 +169,28 @@ def publish_wan_ip(entry, topic_rule, topic_definition):
       entry.publish('./wan-ip', { 'wan-ip': 'N/A', 'error': 'NOT-AVAILABLE', 'time': system.time() })
   else:
     entry.publish('./wan-ip', { 'wan-ip': 'N/A', 'error': 'UNSUPPORTED', 'time': system.time() })
+
+def publish_wan_connected(entry, topic_rule, topic_definition):
+  res = 0
+  if entry.config['wan-connected-check-method'] == 'http':
+    conn = httplib.HTTPSConnection(entry.config['wan-connected-check-ip'], timeout = entry.config['wan-connected-check-timeout'])
+    try:
+      conn.request("HEAD", "/")
+      res = 1
+    except Exception:
+      res = 0
+    finally:
+      conn.close()
+
+  elif entry.config['wan-connected-check-method'] == 'ping':
+    #response = os.system("ping -c 1 -W " + str(entry.config['wan-connected-check-timeout']) + " " + entry.config['wan-connected-check-ip'] + " > /dev/null 2>&1")
+    with open(os.devnull, 'wb') as devnull:
+      response = subprocess.call(['ping', '-c',  '1', '-W', str(entry.config['wan-connected-check-timeout']), entry.config['wan-connected-check-ip']], stdout=devnull, stderr=devnull)
+    
+    if response == 0:
+      res = 1
+
+  entry.publish('', res)
 
 def wan_ip_snmpwalk_command(entry):
   PIPE = subprocess.PIPE
