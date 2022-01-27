@@ -17,7 +17,7 @@ definition = {
     'bandwidth-enabled': False,
     'wan-reconnect-enabled': False,
     
-    "wan-connected-check-method": "ping", # "ping" to use linux shell command ping, or "http" for a http head connection
+    "wan-connected-check-method": "http", # "ping" to use linux shell command ping, or "http" for a http head connection
     "wan-connected-check-ip": "8.8.8.8",
     "wan-connected-check-timeout": 2, # timeout in seconds. Can be a float number
     
