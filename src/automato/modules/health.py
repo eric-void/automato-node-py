@@ -117,7 +117,7 @@ def entry_init(self_entry, entry):
   if entry.is_local:
     for t in entry.definition['publish']:
       # TODO run_cron support
-      if 'run_interval' in entry.definition['publish'][t] or 'check_interval' in entry.definition['publish'][t]:
+      if ('run_interval' in entry.definition['publish'][t] and entry.definition['publish'][t]['run_interval'] != 0) or ('check_interval' in entry.definition['publish'][t] and entry.definition['publish'][t]['check_interval'] != 0):
         interval = utils.read_duration(entry.definition['publish'][t]['check_interval'] if 'check_interval' in entry.definition['publish'][t] else entry.definition['publish'][t]['run_interval']) * self_entry.config['health-check_interval-multiplier']
         if not t in self_entry.health_publish_checker:
           self_entry.health_publish_checker[t] = {}
