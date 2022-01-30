@@ -46,6 +46,8 @@ definition = {
     'bandwidth_down_column': 9, # 1 = received, 9 = transmitted
     'bandwidth_up_column': 1,
     'bandwidth_check_time': '5s',
+    'bandwidth_max_download_mbps': 1000,
+    'bandwidth_max_upload_mbps': 1000,
   },
 
   'description': _('Network utilities'),
@@ -243,6 +245,14 @@ def publish_bandwidth(entry, topic_rule, topic_definition):
   data2 = _bandwidth_proc_net_dev_data(entry.config)
   down_bps = (data2['down'] - data1['down']) * 8 / seconds
   up_bps = (data2['up'] - data1['up']) * 8 / seconds
+  if down_bps > entry.config['bandwidth_max_download_mbps'] * 1024 * 1024:
+    down_bps = entry.config['bandwidth_max_download_mbps'] * 1024 * 1024
+  if down_bps < 0:
+    down_bps = 0
+  if up_bps > entry.config['bandwidth_max_upload_mbps'] * 1024 * 1024:
+    up_bps = entry.config['bandwidth_max_upload_mbps'] * 1024 * 1024
+  if up_bps < 0:
+    up_bps = 0
   
   entry.publish('', {
     'download_bps': round(down_bps),
