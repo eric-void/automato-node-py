@@ -254,8 +254,9 @@ definition = {
       
       # [L.0] Dichiarazioni actions. "js:" può usare le variabili: params, e deve ritornare il payload del messaggio mqtt
       "actions": {
-        "state-get": "",
+        "state-get": "", # pubblica topic=""
         "state-set": "js:params['value'] ? 'on' : 'off'",
+        "state-set": "js:params['port']=='a'?'a':null", # pubblica topic="a" solo se il parametro 'port' == 'a', altrimenti non pubblica nulla
         'output-set': "js:('timer-to' in params ? { state: params['value'], timer_to: params['timer-to'] } : { state: params['value'] })",
         'output-set': {
           'init': 'js:params["port"] = "0"; if ("port1" not in params) params["port1"] = "X"', 
