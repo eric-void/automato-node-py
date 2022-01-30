@@ -335,8 +335,11 @@ def run_step():
     if entry and entry.is_local:
       # Initialization / check configuration validity
       if 'run_interval' in entry.definition and utils.read_duration(entry.definition['run_interval']) <= 0:
-        logging.error('#{id}> invalid run_interval: {run_interval}'.format(id = entry_id, run_interval = entry.definition['run_interval']))
+        if entry.definition['run_interval'] != 0:
+          logging.error('#{id}> invalid run_interval: {run_interval}'.format(id = entry_id, run_interval = entry.definition['run_interval']))
         del entry.definition['run_interval']
+      if 'run_cron' in entry.definition and entry.definition['run_cron'] == "":
+          del entry.definition['run_cron']
       if 'run_cron' in entry.definition and entry_implements(entry_id, 'run') and not ('cron' in entry.data and entry.data['cron'] == entry.definition['run_cron'] and 'next_run' in entry.data):
         if not croniter.is_valid(entry.definition['run_cron']):
           logging.error('#{id}> invalid cron rule: {cron}'.format(id = entry_id, cron = entry.definition['run_cron']))
@@ -375,8 +378,11 @@ def run_step():
         for topic_rule in entry.definition['publish']:
           # Initialization / check configuration validity
           if 'run_interval' in entry.definition['publish'][topic_rule] and utils.read_duration(entry.definition['publish'][topic_rule]['run_interval']) <= 0:
-            logging.error('#{id}> invalid run_interval for topic rule {topic_rule}: {run_interval}'.format(id = entry_id, topic_rule = topic_rule, run_interval = entry.definition['publish'][topic_rule]['run_interval']))
+            if entry.definition['publish'][topic_rule]['run_interval'] != 0:
+              logging.error('#{id}> invalid run_interval for topic rule {topic_rule}: {run_interval}'.format(id = entry_id, topic_rule = topic_rule, run_interval = entry.definition['publish'][topic_rule]['run_interval']))
             del entry.definition['publish'][topic_rule]['run_interval']
+          if 'run_cron' in entry.definition['publish'][topic_rule] and entry.definition['publish'][topic_rule]['run_cron'] == "":
+             del entry.definition['publish'][topic_rule]['run_cron']
           if 'run_cron' in entry.definition['publish'][topic_rule] and not ('cron_' + topic_rule in entry.data and entry.data['cron_' + topic_rule] == entry.definition['publish'][topic_rule]['run_cron'] and 'next_run_' + topic_rule in entry.data):
             if not croniter.is_valid(entry.definition['publish'][topic_rule]['run_cron']):
               logging.error('#{id}> invalid cron rule for publishing topic rule {topic_rule}: {cron}'.format(id = entry_id, topic_rule = topic_rule, cron = entry.definition['publish'][topic_rule]['run_cron']))

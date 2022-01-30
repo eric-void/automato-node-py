@@ -111,8 +111,8 @@ definition = {
   'event_keys': ['...'], # I nomi dei parametri degli eventi che permettono di discriminare eventi diversi, con lo stesso nome. La cache degli eventi (per event_get) e il changed_params dipendono da questo. Il default è ['port', 'channel']. Ad esempio event_get('x.output(js:params['port'] == '1') deve dare un risultato diverso (e cachato a parte) di params['port'] == '2'.
 
   # [L.2]
-  'run_interval': 30, # Se specificato, richiama il metodo "run(entry)" ogni X secondi
-  'run_cron': "*/2 * * * *", # In alternativa a run_interval, specifica ogni quanto avviare il run in base a una regola di cron @see https://en.wikipedia.org/wiki/Cron
+  'run_interval': 30, # Se specificato, richiama il metodo "run(entry)" ogni X secondi. Imposta 0 per disattivare.
+  'run_cron': "*/2 * * * *", # In alternativa a run_interval, specifica ogni quanto avviare il run in base a una regola di cron @see https://en.wikipedia.org/wiki/Cron. Imposta "" per disattivare
   'run_throttle': "skip", # throttle_policy = "skip" (skip this run) | "wait" (postpone this run when possibile) | "force" (do it - if load level is critical this is turned to "wait") | XXX (wait max this number of seconds). This value can be a list ["policy on high load", "policy on very high load"]
   
   # [L.2] Gestito da scripting (per ora)
