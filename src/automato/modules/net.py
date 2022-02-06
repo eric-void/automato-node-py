@@ -173,6 +173,12 @@ def publish_wan_ip(entry, topic_rule, topic_definition):
     entry.publish('./wan-ip', { 'wan-ip': 'N/A', 'error': 'UNSUPPORTED', 'time': system.time() })
 
 def publish_wan_connected(entry, topic_rule, topic_definition):
+  res = _is_wan_connected(entry)
+  if res == 0: # retry
+    res = _is_wan_connected(entry)
+  entry.publish('', res)
+  
+def _is_wan_connected(entry):
   res = 0
   if entry.config['wan-connected-check-method'] == 'http':
     conn = httplib.HTTPSConnection(entry.config['wan-connected-check-ip'], timeout = entry.config['wan-connected-check-timeout'])
@@ -191,8 +197,7 @@ def publish_wan_connected(entry, topic_rule, topic_definition):
     
     if response == 0:
       res = 1
-
-  entry.publish('', res)
+  return res
 
 def wan_ip_snmpwalk_command(entry):
   PIPE = subprocess.PIPE
