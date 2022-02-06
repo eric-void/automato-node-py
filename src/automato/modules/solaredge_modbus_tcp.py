@@ -18,6 +18,7 @@ definition = {
     "solaredge_modbus_tcp_port": 1502,
     "solaredge_modbus_tcp_timeout": 2,
     "solaredge_modbus_tcp_unit": 1,
+    "solaredge_modbus_tcp_skip_status7": True, # input data with "status": 7 means a data fault. Skip this values (keep only "status": 7)
     "solaredge_modbus_tcp_data_filter": {
       "inverter": [
         #"c_manufacturer", "c_model", "c_version", "c_serialnumber", "c_deviceaddress", "c_sunspec_did",
@@ -157,6 +158,8 @@ def publish(entry, topic, definition):
     # NOTE Sometimes data are messed up and should be filtered out. Some values are = 0, others = -32768 (but with a scale that leads to 0)
     filtered = "energy_total" not in values or "temperature" not in values or (_float_is_zero(_get_value("energy_total", values)) and _float_is_zero(_get_value("temperature", values)))
     if not filtered:
+      if entry.config['solaredge_modbus_tcp_skip_status7'] and values['status'] == 7:
+        values = { "status": values['status'] }
       for k, v in values.items():
         if not entry.config['solaredge_modbus_tcp_data_filter'] or ("inverter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["inverter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["inverter"]:
           if "_scale" not in k:
@@ -187,6 +190,8 @@ def publish(entry, topic, definition):
       values = params.read_all()
       filtered = "lifetime_export_energy_counter" not in values or "lifetime_export_energy_counter" not in values or "instantaneous_voltage" not in values or (_float_is_zero(_get_value("lifetime_export_energy_counter", values)) and _float_is_zero(_get_value("lifetime_export_energy_counter", values)) and _float_is_zero(_get_value("instantaneous_voltage", values)))
       if not filtered:
+        if entry.config['solaredge_modbus_tcp_skip_status7'] and values['status'] == 7:
+          values = { "status": values['status'] }
         for k, v in values.items():
           if not entry.config['solaredge_modbus_tcp_data_filter'] or ("battery" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["battery"] or k in entry.config['solaredge_modbus_tcp_data_filter']["battery"]:
             if "_scale" not in k:
