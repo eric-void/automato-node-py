@@ -31,6 +31,7 @@ device_types = {
   'zigbee_temperature': { },
   'zigbee_button': { },
   'zigbee_plug': { },
+  'zigbee_vibration': { },
 }
 
 definition = {
@@ -64,6 +65,8 @@ def entry_install(installer_entry, entry, conf):
           'battery': 'js:((typeof payload == "object") && "battery" in payload ? { value: payload["battery"] } : null)',
           'output': 'js:((typeof payload == "object") && "state" in payload && (payload["state"] == "ON" || payload["state"] == "OFF") ? { value: payload["state"] == "ON" ? 1 : 0 } : null)',
           'water-leak': 'js:((typeof payload == "object") && "water_leak" in payload ? { value: payload["water_leak"] ? 1 : 0 } : null)',
+          'vibration': 'js:((typeof payload == "object") && "vibration" in payload ? (payload["vibration"] ? { value: payload["vibration"] ? 1 : 0, temporary: true } : { value: payload["vibration"] ? 1 : 0}) : null)',
+          'tamper': 'js:((typeof payload == "object") && "tamper" in payload ? { value: payload["tamper"] ? 1 : 0 } : null)',
         },
         'check_interval': '6h', # In genere tutti i device che ho ora mandano almeno 1 notifica all'ora (circa, anche extender e pulsanti), però mi tengo largo e considero 6h [NOTA: In realtà il pulsante ikea manda 1 notifica ogni 24h]
       }
