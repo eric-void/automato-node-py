@@ -154,6 +154,7 @@ def init(entry):
 
 def publish(entry, topic, definition):
   interval = utils.read_duration(definition['run_interval']) if 'run_interval' in definition and definition['run_interval'] else 60
+  logging.debug("DEBUG> PUBLISH: " + str(topic) + " " + str(interval) + " " + str(entry.solaredge_modbus_tcp_data))
   if entry.solaredge_modbus_tcp_time <= system.time() - interval + 1:
     try:
       inverter = solaredge_modbus.Inverter(
@@ -173,7 +174,8 @@ def publish(entry, topic, definition):
           if not entry.config['solaredge_modbus_tcp_data_filter'] or ("inverter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["inverter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["inverter"]:
             if "_scale" not in k:
               inverter_data.update({k: _get_value(k, values)})
-      entry.solaredge_modbus_tcp_data['inverter'] = inverter_data
+      if inverter_data:
+        entry.solaredge_modbus_tcp_data['inverter'] = inverter_data
 
       meter_data = {}
       meters = inverter.meters()
@@ -187,7 +189,8 @@ def publish(entry, topic, definition):
             if not entry.config['solaredge_modbus_tcp_data_filter'] or ("meter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["meter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["meter"]:
               if "_scale" not in k:
                 meter_data[meter].update({k: _get_value(k, values)})
-      entry.solaredge_modbus_tcp_data['meters'] = meter_data
+      for k in meter_data:
+        entry.solaredge_modbus_tcp_data['meters'][k] = meter_data[k]
       
       battery_data = {}
       batteries = inverter.batteries()
@@ -203,21 +206,30 @@ def publish(entry, topic, definition):
             if not entry.config['solaredge_modbus_tcp_data_filter'] or ("battery" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["battery"] or k in entry.config['solaredge_modbus_tcp_data_filter']["battery"]:
               if "_scale" not in k:
                 battery_data[battery].update({k: _get_value(k, values)})
-      entry.solaredge_modbus_tcp_data['batteries'] = battery_data
+      for k in battery_data:
+        entry.solaredge_modbus_tcp_data['batteries'][k] = battery_data[k]
       
       entry.solaredge_modbus_tcp_time = system.time()
+      
+      if inverter_data:
+        entry.publish('./inverter', inverter_data)
+      for k in meter_data:
+        entry.publish('./meter/' + k, meter_data[k])
+      for k in battery_data:
+        entry.publish('./battery/' + k, battery_data[k])
       
     except:
       logging.exception("{id}> Exception during inverter data collection...".format(id = entry.id))
 
-  if entry.solaredge_modbus_tcp_data['inverter']:
-    entry.publish('./inverter', inverter_data)
-  for k in entry.solaredge_modbus_tcp_data['meters']:
-    if entry.solaredge_modbus_tcp_data['meters'][k]:
-      entry.publish('./meter/' + k, entry.solaredge_modbus_tcp_data['meters'][k])
-  for k in entry.solaredge_modbus_tcp_data['batteries']:
-    if entry.solaredge_modbus_tcp_data['batteries'][k]:
-      entry.publish('./battery/' + k, entry.solaredge_modbus_tcp_data['batteries'][k])
+  else:
+    if entry.solaredge_modbus_tcp_data['inverter']:
+      entry.publish('./inverter', entry.solaredge_modbus_tcp_data['inverter'])
+    for k in entry.solaredge_modbus_tcp_data['meters']:
+      if entry.solaredge_modbus_tcp_data['meters'][k]:
+        entry.publish('./meter/' + k, entry.solaredge_modbus_tcp_data['meters'][k])
+    for k in entry.solaredge_modbus_tcp_data['batteries']:
+      if entry.solaredge_modbus_tcp_data['batteries'][k]:
+        entry.publish('./battery/' + k, entry.solaredge_modbus_tcp_data['batteries'][k])
 
 
 def _get_value(k, values):
