@@ -179,11 +179,11 @@ def publish(entry, topic, definition):
       meter_data = {}
       meters = inverter.meters()
       for meter, params in meters.items():
-        meter = meter.lower()
-        meter_data[meter] = {}
         values = params.read_all()
         filtered = "export_energy_active" not in values or "import_energy_active" not in values or "frequency" not in values or (_float_is_zero(_get_value("export_energy_active", values)) and _float_is_zero(_get_value("import_energy_active", values)) and _float_is_zero(_get_value("frequency", values)))
         if not filtered:
+          meter = meter.lower()
+          meter_data[meter] = {}
           for k, v in values.items():
             if not entry.config['solaredge_modbus_tcp_data_filter'] or ("meter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["meter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["meter"]:
               if "_scale" not in k:
@@ -194,11 +194,11 @@ def publish(entry, topic, definition):
       battery_data = {}
       batteries = inverter.batteries()
       for battery, params in batteries.items():
-        battery = battery.lower()
-        battery_data[battery] = {}
         values = params.read_all()
         filtered = "lifetime_export_energy_counter" not in values or "lifetime_export_energy_counter" not in values or "instantaneous_voltage" not in values or (_float_is_zero(_get_value("lifetime_export_energy_counter", values)) and _float_is_zero(_get_value("lifetime_export_energy_counter", values)) and _float_is_zero(_get_value("instantaneous_voltage", values)))
         if not filtered:
+          battery = battery.lower()
+          battery_data[battery] = {}
           if entry.config['solaredge_modbus_tcp_skip_status7'] and values['status'] == 7:
             values = { "status": values['status'] }
           for k, v in values.items():
