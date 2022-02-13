@@ -137,7 +137,7 @@ definition = {
   },
 
   "subscribe": {
-    'status': {
+    './get': {
       "publish": [ 'solaredge/inverter' ],
     }
   }
@@ -154,7 +154,6 @@ def init(entry):
 
 def publish(entry, topic, definition):
   interval = utils.read_duration(definition['run_interval']) if 'run_interval' in definition and definition['run_interval'] else 60
-  logging.debug("DEBUG> PUBLISH: " + str(topic) + " " + str(interval) + " " + str(entry.solaredge_modbus_tcp_data))
   if entry.solaredge_modbus_tcp_time <= system.time() - interval + 1:
     try:
       inverter = solaredge_modbus.Inverter(
