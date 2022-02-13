@@ -134,6 +134,12 @@ definition = {
         ]
       }
     },
+  },
+
+  "subscribe": {
+    'status': {
+      "publish": [ 'solaredge/inverter' ],
+    }
   }
 }
 
@@ -143,64 +149,76 @@ def _float_is_zero(v):
 def init(entry):
   l = logging.getLogger('pymodbus')
   l.propagate = False
+  entry.solaredge_modbus_tcp_data = { 'inverter': {}, 'meters': {}, 'batteries': {}}
+  entry.solaredge_modbus_tcp_time = 0
 
 def publish(entry, topic, definition):
-  try:
-    inverter = solaredge_modbus.Inverter(
-      host = entry.config['solaredge_modbus_tcp_host'],
-      port = entry.config['solaredge_modbus_tcp_port'],
-      timeout = utils.read_duration(entry.config['solaredge_modbus_tcp_timeout']),
-      unit = entry.config['solaredge_modbus_tcp_unit']
-    )
-    
-    inverter_data = {}
-    values = inverter.read_all()
-    # NOTE Sometimes data are messed up and should be filtered out. Some values are = 0, others = -32768 (but with a scale that leads to 0)
-    filtered = "energy_total" not in values or "temperature" not in values or (_float_is_zero(_get_value("energy_total", values)) and _float_is_zero(_get_value("temperature", values)))
-    if not filtered:
-      if entry.config['solaredge_modbus_tcp_skip_status7'] and values['status'] == 7:
-        values = { "status": values['status'] }
-      for k, v in values.items():
-        if not entry.config['solaredge_modbus_tcp_data_filter'] or ("inverter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["inverter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["inverter"]:
-          if "_scale" not in k:
-            inverter_data.update({k: _get_value(k, values)})
-      if (inverter_data):
-        entry.publish('./inverter', inverter_data)
-
-    meter_data = {}
-    meters = inverter.meters()
-    for meter, params in meters.items():
-      meter = meter.lower()
-      meter_data[meter] = {}
-      values = params.read_all()
-      filtered = "export_energy_active" not in values or "import_energy_active" not in values or "frequency" not in values or (_float_is_zero(_get_value("export_energy_active", values)) and _float_is_zero(_get_value("import_energy_active", values)) and _float_is_zero(_get_value("frequency", values)))
-      if not filtered:
-        for k, v in values.items():
-          if not entry.config['solaredge_modbus_tcp_data_filter'] or ("meter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["meter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["meter"]:
-            if "_scale" not in k:
-              meter_data[meter].update({k: _get_value(k, values)})
-        if meter_data[meter]:
-          entry.publish('./meter/' + meter, meter_data[meter])
-
-    battery_data = {}
-    batteries = inverter.batteries()
-    for battery, params in batteries.items():
-      battery = battery.lower()
-      battery_data[battery] = {}
-      values = params.read_all()
-      filtered = "lifetime_export_energy_counter" not in values or "lifetime_export_energy_counter" not in values or "instantaneous_voltage" not in values or (_float_is_zero(_get_value("lifetime_export_energy_counter", values)) and _float_is_zero(_get_value("lifetime_export_energy_counter", values)) and _float_is_zero(_get_value("instantaneous_voltage", values)))
+  interval = utils.read_duration(definition['run_interval']) if 'run_interval' in definition and definition['run_interval'] else 60
+  if entry.solaredge_modbus_tcp_time <= system.time() - interval + 1:
+    try:
+      inverter = solaredge_modbus.Inverter(
+        host = entry.config['solaredge_modbus_tcp_host'],
+        port = entry.config['solaredge_modbus_tcp_port'],
+        timeout = utils.read_duration(entry.config['solaredge_modbus_tcp_timeout']),
+        unit = entry.config['solaredge_modbus_tcp_unit']
+      )
+      inverter_data = {}
+      values = inverter.read_all()
+      # NOTE Sometimes data are messed up and should be filtered out. Some values are = 0, others = -32768 (but with a scale that leads to 0)
+      filtered = "energy_total" not in values or "temperature" not in values or (_float_is_zero(_get_value("energy_total", values)) and _float_is_zero(_get_value("temperature", values)))
       if not filtered:
         if entry.config['solaredge_modbus_tcp_skip_status7'] and values['status'] == 7:
           values = { "status": values['status'] }
         for k, v in values.items():
-          if not entry.config['solaredge_modbus_tcp_data_filter'] or ("battery" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["battery"] or k in entry.config['solaredge_modbus_tcp_data_filter']["battery"]:
+          if not entry.config['solaredge_modbus_tcp_data_filter'] or ("inverter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["inverter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["inverter"]:
             if "_scale" not in k:
-              battery_data[battery].update({k: _get_value(k, values)})
-        if battery_data[battery]:
-          entry.publish('./battery/' + battery, battery_data[battery])
+              inverter_data.update({k: _get_value(k, values)})
+      entry.solaredge_modbus_tcp_data['inverter'] = inverter_data
 
-  except:
-    logging.exception("{id}> Exception during inverter data collection...".format(id = entry.id))
+      meter_data = {}
+      meters = inverter.meters()
+      for meter, params in meters.items():
+        meter = meter.lower()
+        meter_data[meter] = {}
+        values = params.read_all()
+        filtered = "export_energy_active" not in values or "import_energy_active" not in values or "frequency" not in values or (_float_is_zero(_get_value("export_energy_active", values)) and _float_is_zero(_get_value("import_energy_active", values)) and _float_is_zero(_get_value("frequency", values)))
+        if not filtered:
+          for k, v in values.items():
+            if not entry.config['solaredge_modbus_tcp_data_filter'] or ("meter" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["meter"] or k in entry.config['solaredge_modbus_tcp_data_filter']["meter"]:
+              if "_scale" not in k:
+                meter_data[meter].update({k: _get_value(k, values)})
+      entry.solaredge_modbus_tcp_data['meters'] = meter_data
+      
+      battery_data = {}
+      batteries = inverter.batteries()
+      for battery, params in batteries.items():
+        battery = battery.lower()
+        battery_data[battery] = {}
+        values = params.read_all()
+        filtered = "lifetime_export_energy_counter" not in values or "lifetime_export_energy_counter" not in values or "instantaneous_voltage" not in values or (_float_is_zero(_get_value("lifetime_export_energy_counter", values)) and _float_is_zero(_get_value("lifetime_export_energy_counter", values)) and _float_is_zero(_get_value("instantaneous_voltage", values)))
+        if not filtered:
+          if entry.config['solaredge_modbus_tcp_skip_status7'] and values['status'] == 7:
+            values = { "status": values['status'] }
+          for k, v in values.items():
+            if not entry.config['solaredge_modbus_tcp_data_filter'] or ("battery" not in entry.config['solaredge_modbus_tcp_data_filter']) or not entry.config['solaredge_modbus_tcp_data_filter']["battery"] or k in entry.config['solaredge_modbus_tcp_data_filter']["battery"]:
+              if "_scale" not in k:
+                battery_data[battery].update({k: _get_value(k, values)})
+      entry.solaredge_modbus_tcp_data['batteries'] = battery_data
+      
+      entry.solaredge_modbus_tcp_time = system.time()
+      
+    except:
+      logging.exception("{id}> Exception during inverter data collection...".format(id = entry.id))
+
+  if entry.solaredge_modbus_tcp_data['inverter']:
+    entry.publish('./inverter', inverter_data)
+  for k in entry.solaredge_modbus_tcp_data['meters']:
+    if entry.solaredge_modbus_tcp_data['meters'][k]:
+      entry.publish('./meter/' + k, entry.solaredge_modbus_tcp_data['meters'][k])
+  for k in entry.solaredge_modbus_tcp_data['batteries']:
+    if entry.solaredge_modbus_tcp_data['batteries'][k]:
+      entry.publish('./battery/' + k, entry.solaredge_modbus_tcp_data['batteries'][k])
+
 
 def _get_value(k, values):
   v = values[k]
