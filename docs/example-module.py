@@ -260,7 +260,7 @@ definition = {
         'output-set': "js:('timer-to' in params ? { state: params['value'], timer_to: params['timer-to'] } : { state: params['value'] })",
         'output-set': {
           'init': 'js:params["port"] = "0"; if ("port1" not in params) params["port1"] = "X"', 
-          'topic': 'js:"' + base_topic + 'relay/" + ("port" in params ? params["port"] : "0") + "/command"', 
+          'topic': 'js:"' + base_topic + 'relay/" + ("port" in params ? params["port"] : "0") + "/command"', # può essere anche senza "js:" davanti, nel caso è la stringa diretta
           'payload': 'js:params["value"] ? "on" : "off"'
         },
         # initialize an event 'action/output-set' with this params (and time = -1)
