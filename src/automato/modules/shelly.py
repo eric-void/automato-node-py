@@ -283,7 +283,7 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
         }
       }
       
-      # Notification of switch status: usually sent after a Switch.Set method, or via external sources ("source": "MQTT" | "WS_in" (web interface))
+      # Notification of switch status: usually sent after a Switch.Set method, or via external sources ("source": "MQTT" | "WS_in" (web interface) | "switch" (physical switch))
       # ex: shellyplus1-a8032abc7158/events/rpc = {"src":"shellyplus1-a8032abc7158","dst":"shellyplus1-a8032abc7158/events","method":"NotifyStatus","params":{"ts":1646738883.91,"switch:0":{"id":0,"output":true,"source":"MQTT"}}}
       definition_extra['publish']['switch_' + str(component_id) + '_status'] = {
         'topic': base_topic + "/events/rpc[js:payload['method'] == 'NotifyStatus' && '" + component + "' in payload['params'] && 'output' in payload['params']['" + component + "'] ]",
@@ -330,7 +330,8 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
     elif device_conf['components'][component] == 'input':
       ports['input'].append(component_id)
       
-      # Notification of input status
+      # Notification of input status: used when input type = 'switch'
+      # ex: shellyplus1-a8032abc7158/events/rpc = b'{"src":"shellyplus1-a8032abc7158","dst":"shellyplus1-a8032abc7158/events","method":"NotifyStatus","params":{"ts":1646946181.62,"input:0":{"id":0,"state":false}}}'
       definition_extra['publish']['input_' + str(component_id) + '_status'] = {
         'topic': base_topic + "/events/rpc[js:payload['method'] == 'NotifyStatus' && '" + component + "' in payload['params'] && 'state' in payload['params']['" + component + "'] ]",
         'description': _('Input status notification'),
@@ -342,7 +343,22 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
         },
       }
         
+      # Notification of input events: used when input type = 'button'. Event can be single_push, long_push, double_push, btn_down (ignored), btn_up (ignored)
+      # @see https://shelly-api-docs.shelly.cloud/gen2/Components/FunctionalComponents/Input/#notifications
+      # ex: shellyplus1-a8032abc7158/events/rpc = b'{"src":"shellyplus1-a8032abc7158","dst":"shellyplus1-a8032abc7158/events","method":"NotifyEvent","params":{"ts":1646945882.47,"events":[{"component":"input:0", "id":0, "event":"double_push", "ts":1646945882.47}]}}'
+      definition_extra['publish']['input_' + str(component_id) + '_event'] = {
+        'topic': base_topic + "/events/rpc[js:payload['method'] == 'NotifyEvent' && payload['params']['events'][0]['component'] == '" + component + "']",
+        'description': _('Input event notification'),
+        'type': 'object',
+        'notify_level': 'debug', 'notify': _("Shelly device '{caption}' " + component + " event: {payload[params][events][0][event]}"),
+        'events': {
+          'input': 'js:(["single_push", "double_push", "long_push"].indexOf(payload["params"]["events"][0]["event"]) > -1 ? { value: 1, port: ' + str(component_id) + ', temporary: true, channel: payload["params"]["events"][0]["event"] == "single_push" ? "singlepush" : (payload["params"]["events"][0]["event"] == "double_push" ? "doublepush" : "longpush")} : null)',
+          'clock': 'js:({ value: parseInt(payload["params"]["ts"]) })',
+        },
+      }
+        
       # method Input.GetStatus
+      # ex: shellyplus1-a8032abc7158/rpc = b'{"id": 0, "src":"shellyplus1-a8032abc7158/response", "method": "Input.GetStatus", "params": {"id": 0}}'
       definition_extra['subscribe']['input_' + str(component_id) + '_get'] = {
         'topic': base_topic + "/rpc[js:payload['method'] == 'Input.GetStatus' && payload['params']['id'] == " + str(component_id) + "]",
         'description': _('Input get status'),
@@ -359,7 +375,8 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
         }
       }
 
-      # Response with input status
+      # Response with input status (NOTE: for input of type button, state returned is null, we decode it as "value: 0")
+      # ex: shellyplus1-a8032abc7158/response/rpc = b'{"id":0,"src":"shellyplus1-a8032abc7158","dst":"shellyplus1-a8032abc7158/response","result":{"id":0,"state":false}}'
       definition_extra['publish']['input_' + str(component_id) + '_status_response'] = {
         'topic': base_topic + '/response/rpc[js:payload["result"]["id"] == ' + str(component_id) + ' && "state" in payload["result"]]',
         'description': _('Input status response'),
@@ -377,7 +394,7 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
     definition_extra['actions']['output-set:init'] = {'value:def': [0, 1], 'port:def': ports['output']}
     definition_extra['actions']['output-get:init'] = {'port:def': ports['output']}
   if ports['input']:
-    definition_extra['events']['input:init'] = {'value:def': [0, 1], 'port:def': ports['input']}
+    definition_extra['events']['input:init'] = {'value:def': [0, 1], 'port:def': ports['input'], 'channel:def': ['singlepush', 'doublepush', 'longpush']}
     definition_extra['actions']['input-get:init'] = {'port:def': ports['input']}
   
   #print(str(definition_extra))
