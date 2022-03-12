@@ -104,7 +104,7 @@ def entry_install(installer_entry, entry, conf):
       },
       'notify_level': 'debug', 'notify': _("Shelly device '{caption}' input #{matches[1]} state is: {_[payload!caption]}"),
       'events': {
-        'input': 'js:({value: parseInt(payload), port: matches[1], channel: "singlepush"})',
+        'input': 'js:({value: parseInt(payload), port: matches[1], channel: null})',
       }
     }
     definition_extra['publish']['longpush'] = {
@@ -119,7 +119,7 @@ def entry_install(installer_entry, entry, conf):
       },
       'notify_level': 'debug', 'notify': _("Shelly device '{caption}' input #{matches[1]} longpush state is: {_[payload!caption]}"),
       'events': {
-        'input': 'js:({value: parseInt(payload), port: matches[1], channel: "longpush"})',
+        'input': 'js:({value: 1, temporary: true, port: matches[1], channel: parseInt(payload) ? "longpush" : "singlepush"})',
       }
     }
     definition_extra['events']['input:init'] = {'port:def': t['input_port:def'], 'value:def': t['input:def'], 'channel:def': ['singlepush', 'longpush']}
@@ -278,7 +278,7 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
         'actions': {
           'output-set': {
             'topic': base_topic + '/rpc',
-            'payload': 'js:params["port"] == ' + str(component_id) + ' ? ({"id": uniqid(), "src":"' + base_topic + '/response", "method":"Switch.Set", "params":{"id": ' + str(component_id) + ',"on": params["value"] ? true : false } }) : null',
+            'payload': 'js:' + ('!("port" in params) || ' if component_id == 0 else '') + 'params["port"] == ' + str(component_id) + ' ? ({"id": uniqid(), "src":"' + base_topic + '/response", "method":"Switch.Set", "params":{"id": ' + str(component_id) + ',"on": params["value"] ? true : false } }) : null',
           }
         }
       }
@@ -309,7 +309,7 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
         'actions': {
           'output-get': {
             'topic': base_topic + '/rpc',
-            'payload': 'js:params["port"] == ' + str(component_id) + ' ? ({"id": uniqid(), "src":"' + base_topic + '/response", "method":"Switch.GetStatus", "params":{"id": ' + str(component_id) + '} }) : null',
+            'payload': 'js:' + ('!("port" in params) || ' if component_id == 0 else '') + 'params["port"] == ' + str(component_id) + ' ? ({"id": uniqid(), "src":"' + base_topic + '/response", "method":"Switch.GetStatus", "params":{"id": ' + str(component_id) + '} }) : null',
           }
         }
       }
@@ -370,7 +370,7 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
         'actions': {
           'input-get': {
             'topic': base_topic + '/rpc',
-            'payload': 'js:params["port"] == ' + str(component_id) + ' ? ({"id": uniqid(), "src":"' + base_topic + '/response", "method":"Input.GetStatus", "params":{"id": ' + str(component_id) + '} }) : null',
+            'payload': 'js:' + ('!("port" in params) || ' if component_id == 0 else '') + 'params["port"] == ' + str(component_id) + ' ? ({"id": uniqid(), "src":"' + base_topic + '/response", "method":"Input.GetStatus", "params":{"id": ' + str(component_id) + '} }) : null',
           }
         }
       }
