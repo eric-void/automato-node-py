@@ -18,13 +18,13 @@ Events generated:
 
 definition = {
   'config': {
-    # Consider an entry dead if disconnected and not reconnected within this time
+    # Consider an entry dead if disconnected and not reconnected within this time. Use "0" to disable check
     # [Available also in specific entry config]
     'health-dead-disconnected-timeout': '1m',
     # If setted, every entry is considered alive when it sends a message
     # [Available also in specific entry config]
     'health-alive-on-message': True,
-    # If setted, every entry is considered dead when no messages are sent in X time
+    # If setted, every entry is considered dead when no messages are sent in X time (messages emitting these events are ignored: connected, alive, failure)
     # [Available also in specific entry config]
     #'health-dead-message-timeout': '10m',
 
@@ -104,7 +104,9 @@ def entry_load(self_entry, entry):
       "events_listen": [".connected", ".alive", ".failure"]
     });
 
-    if system.entry_support_event(entry, 'connected'):
+def entry_init(self_entry, entry):
+  if entry.is_local:
+    if entry.health_config_dead_disconnected_timeout > 0 and system.entry_support_event(entry, 'connected'):
       entry.on('connected', lambda source_entry, eventname, eventdata, caller, published_message: event_connected(self_entry, source_entry, eventname, eventdata, caller, published_message), None, self_entry)
     
     if 'required' in entry.definition and entry.definition['required']:
@@ -113,8 +115,6 @@ def entry_load(self_entry, entry):
         if rentry:
           _system_loaded_add_required_listeners(self_entry, rentry, entry)
 
-def entry_init(self_entry, entry):
-  if entry.is_local:
     for t in entry.definition['publish']:
       # TODO run_cron support
       if ('run_interval' in entry.definition['publish'][t] and entry.definition['publish'][t]['run_interval'] != 0) or ('check_interval' in entry.definition['publish'][t] and entry.definition['publish'][t]['check_interval'] != 0):
