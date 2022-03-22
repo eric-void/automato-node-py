@@ -406,8 +406,8 @@ def entry_install(self_entry, entry, conf):
   entry.handlers_add('init', 'toggle', entry_init)
 
 def entry_uninstall(self_entry, entry, conf):
-  # Deve effettuare la pulizia di eventuale ambiente inizializzato in entry_load
-  # Da notare che eventuali event_listener inizializzati in entry_load, se correttamente passato il reference_entry, non è necessario pulirli
+  # Deve effettuare la pulizia di eventuale ambiente inizializzato in entry_install
+  # Da notare che eventuali event_listener inizializzati in entry_install, se correttamente passato il reference_entry, non è necessario pulirli
   pass
 
 # Inizializzazione: avviata alla creazione del modulo
