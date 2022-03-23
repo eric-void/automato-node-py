@@ -273,7 +273,8 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
           # TODO i should check payload[id]
           base_topic + '/response/rpc[js:payload["result"]["id"] == ' + str(component_id) + ' && "was_on" in payload["result"]]',
           # ex: shellyplus1-a8032abc7158/events/rpc = {"src":"shellyplus1-a8032abc7158","dst":"shellyplus1-a8032abc7158/events","method":"NotifyStatus","params":{"ts":1646738883.91,"switch:0":{"id":0,"output":true,"source":"MQTT"}}}
-          base_topic + "/events/rpc[js:payload['method'] == 'NotifyStatus' && '" + component + "' in payload['params'] && 'output' in payload['params']['" + component + "'] ]",
+          # DISABLED: this message is sent only if switch status is changed, so it's not mandatory
+          # base_topic + "/events/rpc[js:payload['method'] == 'NotifyStatus' && '" + component + "' in payload['params'] && 'output' in payload['params']['" + component + "'] ]",
         ],
         'actions': {
           'output-set': {
