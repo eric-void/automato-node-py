@@ -201,6 +201,7 @@ definition = {
         "eventname:group": 1, # Numero di secondi di raggruppamento: se impostato, l'evento non viene generato subito ma si uniscono tutti gli eventi uguali che occorrono entro i secondi specificati. L'evento verrà poi emesso (senza alcun messaggio correlato) dopo X tempo.
           # WARN: Attivare questo sistema introduce un ritardo negli eventi di X secondi. Inoltre i PublishedMessage che vengono generati non avranno l'evento associato.
       },
+      "events_debug": 1|2, # Genera un log "EVENT_DEBUG>" con gli eventi generati. Se = 2 NON genera gli eventi (li mette nel log e basta)
       
       # [L.2] Esegue questo publish quando viene emesso l'evento specificato
       "run_on": [ "entry_id.event(condition)", "..." ],
