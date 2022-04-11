@@ -24,7 +24,7 @@ definition = {
     'iw_event_command': 'iw event',
     'iw_dev_command': 'iw dev | grep Interface | cut -f 2 -s -d" "',
     'iw_station_dump_command': 'iw dev {INTERFACE} station dump | grep Station | cut -f 2 -s -d" "',
-    'use_arp': True, # Use arp file to detect ip addresses
+    'use_arp': True, # Use arp file to detect ip addresses and for periodic checks (arp checks also in wired interfaces)
     'arp_location': '/proc/net/arp',
   },
   
@@ -95,7 +95,10 @@ def start(entry):
     entry.thread_iwevent.start()    
 
 def run(installer_entry):
-  _iwdev_run(installer_entry)
+  if not installer_entry.config['use_arp']:
+    _iwdev_run(installer_entry)
+  else:
+    _arp_run(installer_entry)
 
 def _iwevent_thread(installer_entry):
   logging.debug("#{id}> starting iw event polling ...".format(id = installer_entry.id))
@@ -132,11 +135,11 @@ def _iwdev_run(installer_entry):
       if re.search('^([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})$', mac_address.strip(), re.IGNORECASE):
         mac_address_detected(installer_entry, env, mac_address.strip().upper())
 
-#def _arp_run(installer_entry):
-#  env = {}
-#  l = _arp_list(installer_entry)
-#  for mac_address in l:
-#    mac_address_detected(installer_entry, env, mac_address, ip_address = l[mac_address])
+def _arp_run(installer_entry):
+  env = {}
+  l = _arp_list(installer_entry)
+  for mac_address in l:
+    mac_address_detected(installer_entry, env, mac_address, ip_address = l[mac_address])
 
 def _arp_list(installer_entry):
   logging.debug("#{id}> arp list fetching ...".format(id = installer_entry.id))
