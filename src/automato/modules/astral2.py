@@ -25,6 +25,23 @@ definition = {
   
   'description': _('Export times for various positions of the sun: dawn, sunrise, solar noon, sunset, dusk.'),
   'run_interval': "5m",
+  
+  'publish': {
+    'astral/data': {
+      'type': 'object',
+      'notify': _('Sun info for today: dawn={payload[dawn]}, sunrise={payload[sunrise]}, noon={payload[noon]}, sunset={payload[sunset]}, dusk={payload[dusk]}'),
+      'notify_type': 'info',
+      'events': {
+        'clock': [
+          "js:({value: payload['ts_dawn'], port: 'astral/dawn'})",
+          "js:({value: payload['ts_sunrise'], port: 'astral/sunrise'})",
+          "js:({value: payload['ts_noon'], port: 'astral/noon'})",
+          "js:({value: payload['ts_sunset'], port: 'astral/sunset'})",
+          "js:({value: payload['ts_dusk'], port: 'astral/dusk'})",
+        ]
+      }
+    }
+  }
 }
 
 def init(entry):
@@ -50,6 +67,24 @@ def run(entry):
     
     if datetime.date.today() != datetime.date.fromtimestamp(entry.sun_updated):
       sun = entry.location.sun(local = True)
+      entry.publish('astral/data', {
+        'dawn': str(sun['dawn']),
+        'sunrise': str(sun['sunrise']),
+        'noon': str(sun['noon']),
+        'sunset': str(sun['sunset']),
+        'dusk': str(sun['dusk']),
+        'ts_dawn': int(sun['dawn'].timestamp()),
+        'ts_sunrise': int(sun['sunrise'].timestamp()),
+        'ts_noon': int(sun['noon'].timestamp()),
+        'ts_sunset': int(sun['sunset'].timestamp()),
+        'ts_dusk': int(sun['dusk'].timestamp()),
+        'h_dawn': utils.hour(sun['dawn']),
+        'h_sunrise': utils.hour(sun['sunrise']),
+        'h_noon': utils.hour(sun['noon']),
+        'h_sunset': utils.hour(sun['sunset']),
+        'h_dusk': utils.hour(sun['dusk']),
+      })
+      
       entry.exports['ts'] = now
       entry.exports['ts_dawn'] = int(sun['dawn'].timestamp())
       entry.exports['ts_sunrise'] = int(sun['sunrise'].timestamp())
