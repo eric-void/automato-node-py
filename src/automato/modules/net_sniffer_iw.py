@@ -34,8 +34,10 @@ definition = {
     'use_arp': True, # Use arp file to detect ipv4 addresses
     'arp_location': '/proc/net/arp',
     
-    'use_ping': False, # Use ping command to detect if a device is connected when in doubt (used for "ip neigh" line with "STALE" or "DELAY" status)
+    'use_ping_command': False, # Use ping command to detect if a device is connected when in doubt (used for "ip neigh" line with "STALE" or "DELAY" status). WARN: NEED ROOT PRIVILEGES
     'ping_command': 'ping -c 2 -W 1 -A', # c: number of pings sent, W: wait for each ping after all sent, A: stop at first received. "-c 2 -W 1 -A" waits max 2 seconds
+    
+    'use_ping_module': False, # Use ping module (via icmplib library). Can be executed without ROOT privileges, but the system should be prepared. See module docs or icmplib docs
   },
   
   'run_interval': 60,
@@ -178,7 +180,7 @@ def _ip_neigh_run(installer_entry):
       if r['state'] == 'REACHABLE':
         mac_address_detected(installer_entry, env, r['mac_address'], False, r['ipv4'], 'ip_neigh')
       # if STALE or DELAY i check if it has been detected by other methods. If not, and ping is available, let's try pinging it
-      elif (r['state'] == 'STALE' or r['state'] == 'DELAY') and installer_entry.config['use_ping'] and system.time() - installer_entry.net_sniffer_mac_addresses[r['mac_address']]['last_seen'] > utils.read_duration(installer_entry.config['connection_time']):
+      elif (r['state'] == 'STALE' or r['state'] == 'DELAY') and (installer_entry.config['use_ping_command'] or installer_entry.config['use_ping_module']) and system.time() - installer_entry.net_sniffer_mac_addresses[r['mac_address']]['last_seen'] > utils.read_duration(installer_entry.config['connection_time']):
         mac_address_detected(installer_entry, env, r['mac_address'], not _ping(installer_entry, r['ipv4'] if r['ipv4'] else r['ipv6']), r['ipv4'], 'ip_neigh_ping')
 
 def __ip_neigh_process_line(line):
@@ -190,10 +192,12 @@ def __ip_neigh_process_line(line):
 
 def _ping(installer_entry, ip):
   # WARN Used also in net.module (@see entry.config['wan-connected-check-method'] == 'ping'), should be unified
-  with open(os.devnull, 'wb') as devnull:
-    response = subprocess.call(installer_entry.config['ping_command'].split(' ') + [ip], stdout=devnull, stderr=devnull)
-  logging.debug("#{id}> pinged {ip} = {response}".format(id = installer_entry.id, ip = ip, response = (response == 0)))
-  return response == 0
+  if installer_entry.config['use_ping_command']:
+    response = subprocess.run(installer_entry.config['ping_command'].split(' ') + [ip], capture_output = True)
+    logging.debug("#{id}> pinged {ip}: {response}".format(id = installer_entry.id, ip = ip, response = response))
+    return response.returncode == 0
+  if installer_entry.config['use_ping_module']:
+    return entries_invoke('ping', ip)
 
 def mac_address_detected(installer_entry, env, mac_address, disconnected = False, ip_address = None, method = None):
   if mac_address in installer_entry.net_sniffer_mac_addresses:
