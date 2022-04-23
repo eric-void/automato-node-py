@@ -179,7 +179,7 @@ def _ip_neigh_run(installer_entry):
         mac_address_detected(installer_entry, env, r['mac_address'], False, r['ipv4'], 'ip_neigh')
       # if STALE or DELAY i check if it has been detected by other methods. If not, and ping is available, let's try pinging it
       elif (r['state'] == 'STALE' or r['state'] == 'DELAY') and installer_entry.config['use_ping'] and system.time() - installer_entry.net_sniffer_mac_addresses[r['mac_address']]['last_seen'] > utils.read_duration(installer_entry.config['connection_time']):
-        mac_address_detected(installer_entry, env, r['mac_address'], _ping(installer_entry, r['ipv4'] if r['ipv4'] else r['ipv6']), r['ipv4'], 'ip_neigh_ping')
+        mac_address_detected(installer_entry, env, r['mac_address'], not _ping(installer_entry, r['ipv4'] if r['ipv4'] else r['ipv6']), r['ipv4'], 'ip_neigh_ping')
 
 def __ip_neigh_process_line(line):
   # IPV4|IPV6 "dev" INTERFACE ["lladdr" MAC_ADDRESS_LOWECASE] "STALE|DELAY|REACHABLE|FAILED"
@@ -192,7 +192,7 @@ def _ping(installer_entry, ip):
   # WARN Used also in net.module (@see entry.config['wan-connected-check-method'] == 'ping'), should be unified
   with open(os.devnull, 'wb') as devnull:
     response = subprocess.call(['ping', '-c',  '1', '-W', str(installer_entry.config['ping_timeout']), ip], stdout=devnull, stderr=devnull)
-  logging.debug("#{id}> pinged {ip} = {response}".format(id = installer_entry.id, ip = ip, response = response))
+  logging.debug("#{id}> pinged {ip} = {response}".format(id = installer_entry.id, ip = ip, response = (response == 0)))
   return response == 0
 
 def mac_address_detected(installer_entry, env, mac_address, disconnected = False, ip_address = None, method = None):
