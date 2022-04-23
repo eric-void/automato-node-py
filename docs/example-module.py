@@ -262,7 +262,9 @@ definition = {
         'output-set': {
           'init': 'js:params["port"] = "0"; if ("port1" not in params) params["port1"] = "X"', 
           'topic': 'js:"' + base_topic + 'relay/" + ("port" in params ? params["port"] : "0") + "/command"', # può essere anche senza "js:" davanti, nel caso è la stringa diretta
-          'payload': 'js:params["value"] ? "on" : "off"'
+          'payload': 'js:params["value"] ? "on" : "off"',
+          'qos': 0,
+          'retain': false
         },
         # initialize an event 'action/output-set' with this params (and time = -1)
         'output-set:init': { 'value:unit': 'W', 'value:def': [0, 1] }
