@@ -23,6 +23,7 @@ definition = {
     #"presence_home_location": { "latitude": 0, "longitude": 0, "radius": 1000 },
     #"presence_home_regions": [ "home", "Casa" ],
     "presence_location_session_duration": "15m",
+    "presence_connection_duration": "15m", # at least "send_connect_message_every" in net_sniffer_iw
     "presence_connection_after_disconnect": "5m",
   },
   
@@ -186,7 +187,7 @@ def on_entry_event_connected(self_entry, entry, eventname, eventdata, caller, pu
   params = eventdata['params']
   if ("temporary" not in params or not params["temporary"]) and "presence_detect" in entry.definition:
     if params['value']:
-      presence_method_detected(self_entry, entry.definition["presence_detect"], 'connected/' + entry.id + (('.' + str(params['key'])) if 'key' in params else ''))
+      presence_method_detected(self_entry, entry.definition["presence_detect"], 'connected/' + entry.id + (('.' + str(params['key'])) if 'key' in params else ''), self_entry.config["presence_connection_duration"])
     else:
       presence_method_gone_away(self_entry, entry.definition["presence_detect"], 'connected/' + entry.id + (('.' + str(params['key'])) if 'key' in params else ''), self_entry.config["presence_connection_after_disconnect"])
 
