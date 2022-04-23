@@ -35,7 +35,7 @@ definition = {
     'arp_location': '/proc/net/arp',
     
     'use_ping': False, # Use ping command to detect if a device is connected when in doubt (used for "ip neigh" line with "STALE" or "DELAY" status)
-    'ping_timeout': 1, # Seconds for ping timeout (it's a local network ping, so 1 second should be safe)
+    'ping_command': 'ping -c 2 -W 1 -A', # c: number of pings sent, W: wait for each ping after all sent, A: stop at first received. "-c 2 -W 1 -A" waits max 2 seconds
   },
   
   'run_interval': 60,
@@ -191,7 +191,7 @@ def __ip_neigh_process_line(line):
 def _ping(installer_entry, ip):
   # WARN Used also in net.module (@see entry.config['wan-connected-check-method'] == 'ping'), should be unified
   with open(os.devnull, 'wb') as devnull:
-    response = subprocess.call(['ping', '-c',  '1', '-W', str(installer_entry.config['ping_timeout']), ip], stdout=devnull, stderr=devnull)
+    response = subprocess.call(installer_entry.config['ping_command'].split(' ') + [ip], stdout=devnull, stderr=devnull)
   logging.debug("#{id}> pinged {ip} = {response}".format(id = installer_entry.id, ip = ip, response = (response == 0)))
   return response == 0
 
