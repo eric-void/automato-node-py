@@ -168,6 +168,7 @@ def _arp_process_line(line):
   return [m.group(2).upper(), m.group(1)] if m else None
 
 def _ip_neigh_run(installer_entry):
+  logging.debug("#{id}> ip neigh fetching ...".format(id = installer_entry.id))
   env = {}
   result = subprocess.check_output(installer_entry.config['ip_neigh_command'], shell=True, stderr=subprocess.STDOUT).decode("utf-8")
   for line in result.split("\n"):
@@ -191,11 +192,12 @@ def _ping(installer_entry, ip):
   # WARN Used also in net.module (@see entry.config['wan-connected-check-method'] == 'ping'), should be unified
   with open(os.devnull, 'wb') as devnull:
     response = subprocess.call(['ping', '-c',  '1', '-W', str(installer_entry.config['ping_timeout']), ip], stdout=devnull, stderr=devnull)
+  logging.debug("#{id}> pinged {ip} = {response}".format(id = installer_entry.id, ip = ip, response = response))
   return response == 0
 
 def mac_address_detected(installer_entry, env, mac_address, disconnected = False, ip_address = None, method = None):
   if mac_address in installer_entry.net_sniffer_mac_addresses:
-    logging.debug("#{id}> mac_address_detected: {mac_address}, connected: {connected}, ip_address: {ip_address}".format(id = installer_entry.id, mac_address = mac_address, connected = not disconnected, ip_address = ip_address))
+    logging.debug("#{id}> mac_address_detected: {mac_address}, connected: {connected}, ip_address: {ip_address}, method: {method}".format(id = installer_entry.id, mac_address = mac_address, connected = not disconnected, ip_address = ip_address, method = method))
     entry = system.entry_get(installer_entry.net_sniffer_mac_addresses[mac_address]['entry_id'])
     if entry:
       was_connected = installer_entry.net_sniffer_mac_addresses[mac_address]['connected']
@@ -219,7 +221,7 @@ def mac_address_detected(installer_entry, env, mac_address, disconnected = False
         if not ip_address and installer_entry.net_sniffer_mac_addresses[mac_address]['last_ip_address']:
           ip_address = installer_entry.net_sniffer_mac_addresses[mac_address]['last_ip_address']
 
-      logging.debug("#{id}> {entry}: mac_address_detected, res: {publish}, mac: {mac_address}, connected: {connected}, ip_address: {ip_address}, momentary: {momentary}, was_connected: {was_connected}, last_seen: {last_seen}".format(id = installer_entry.id, entry = entry.id, publish = publish, mac_address = mac_address, connected = not disconnected, ip_address = ip_address, momentary = installer_entry.net_sniffer_mac_addresses[mac_address]['momentary'], was_connected = was_connected, last_seen = last_seen))
+      logging.debug("#{id}> {entry}: mac_address_detected, res: {publish}, mac: {mac_address}, connected: {connected}, ip_address: {ip_address}, momentary: {momentary}, was_connected: {was_connected}, last_seen: {last_seen}, method: {method}".format(id = installer_entry.id, entry = entry.id, publish = publish, mac_address = mac_address, connected = not disconnected, ip_address = ip_address, momentary = installer_entry.net_sniffer_mac_addresses[mac_address]['momentary'], was_connected = was_connected, last_seen = last_seen, method = method))
       
       if publish:
         data = { 'mac_address': mac_address, 'was_connected': was_connected, 'method': method }
