@@ -9,6 +9,7 @@ import re
 
 from automato.core import system
 from automato.core import utils
+from automato.node import node_system as node
 
 definition = {
   'description': _('Sniff network searching for devices with mac addresses'),
@@ -197,7 +198,7 @@ def _ping(installer_entry, ip):
     logging.debug("#{id}> pinged {ip}: {response}".format(id = installer_entry.id, ip = ip, response = response))
     return response.returncode == 0
   if installer_entry.config['use_ping_module']:
-    return entries_invoke('ping', ip)
+    return node.entries_invoke('ping', ip)
 
 def mac_address_detected(installer_entry, env, mac_address, disconnected = False, ip_address = None, method = None):
   if mac_address in installer_entry.net_sniffer_mac_addresses:
