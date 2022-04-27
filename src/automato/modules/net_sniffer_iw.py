@@ -24,46 +24,60 @@ definition = {
     'connection_time': '15m', # If a connected device is no more detected after this time, it's considered disconnected
     'send_connect_message_every': '10m', # If a device is connected, resend a connect message on this interval (set to 0 to disable)
     
-    'use_iw': True,
+    # The 3 options below could also be an array of handlers, or None/False to disable that handler
+    'event_monitor_handler': 'iw',
+    'polling_handler': 'iw',
+    'ip_get_handler': 'arp', # method for retrieving ip if original handler doesn't provide it
+    
     'iw_event_command': 'iw event',
     'iw_dev_command': 'iw dev | grep Interface | cut -f 2 -s -d" "',
     'iw_station_dump_command': 'iw dev {INTERFACE} station dump | grep Station | cut -f 2 -s -d" "',
     
-    'use_ip_neigh': False,
     'ip_neigh_command': 'ip neigh',
     
-    'use_arp': True, # Use arp file to detect ipv4 addresses
     'arp_location': '/proc/net/arp',
     
     'use_ping_command': False, # Use ping command to detect if a device is connected when in doubt (used for "ip neigh" line with "STALE" or "DELAY" status). WARN: NEED ROOT PRIVILEGES
     'ping_command': 'ping -c 2 -W 1 -A', # c: number of pings sent, W: wait for each ping after all sent, A: stop at first received. "-c 2 -W 1 -A" waits max 2 seconds
     
-    'use_ping_module': False, # Use ping module (via icmplib library). Can be executed without ROOT privileges, but the system should be prepared. See module docs or icmplib docs
+    'use_ping_module': False, # Use ping module (via icmplib library) to detect if a device is connected when in doubt (same as use_ping_command). Can be executed without ROOT privileges, but the system should be prepared. See module docs or icmplib docs
   },
   
-  'run_interval': 60,
+  'run_interval': 60, # = polling interval
 }
 
-def load(entry):
-  entry.net_sniffer_mac_addresses = {} # mac_address:{ 'entry_id': STR, 'momentary': BOOL, 'connected': BOOL, 'last_seen': TIMESTAMP, 'last_published': TIMESTAMP, 'last_ip_address': [STR] }
+def load(installer_entry):
+  installer_entry.net_sniffer_mac_addresses = {} # mac_address:{ 'entry_id': STR, 'momentary': BOOL, 'connected': BOOL, 'last_seen': TIMESTAMP, 'last_published': TIMESTAMP, 'last_ip_address': [STR] }
 
-def init(entry):
-  entry.destroyed = False
-  entry.thread_iwevent = None
-  entry.thread_iwevent_proc = None
+def init(installer_entry):
+  installer_entry.destroyed = False
   
-  entry.thread_checker = threading.Thread(target = _thread_checker, args = [entry], daemon = True)
-  entry.thread_checker._destroyed = False
-  entry.thread_checker.start()
+  for k in ['event_monitor_handler', 'polling_handler', 'ip_get_handler']:
+    if not installer_entry.config[k]:
+      installer_entry.config[k] = []
+    elif isinstance(installer_entry.config[k], str):
+      installer_entry.config[k] = [installer_entry.config[k]]
+  
+  installer_entry.net_sniffer_all_handlers = []
+  for h in installer_entry.config['event_monitor_handler'] + installer_entry.config['polling_handler'] + installer_entry.config['ip_get_handler']:
+    if h not in installer_entry.net_sniffer_all_handlers:
+      installer_entry.net_sniffer_all_handlers.append(h)
+  
+  for h in installer_entry.net_sniffer_all_handlers:
+    if (h + '_init') in globals():
+      globals()[h + '_init'](installer_entry)
+  
+  installer_entry.thread_polling = threading.Thread(target = _thread_polling, args = [installer_entry], daemon = True)
+  installer_entry.thread_polling._destroyed = False
+  installer_entry.thread_polling.start()
 
-def destroy(entry):
-  _iwevent_thread_kill(entry)
-  if entry.thread_iwevent and not entry.thread_iwevent._destroyed:
-    entry.thread_iwevent._destroyed = True
-    entry.thread_iwevent.join()
-    
-  entry.thread_checker._destroyed = True
-  entry.thread_checker.join()
+def destroy(installer_entry):
+  for h in installer_entry.net_sniffer_all_handlers:
+    if (h + '_destroy') in globals():
+      globals()[h + '_destroy'](installer_entry)
+
+  installer_entry.thread_polling._destroyed = True
+  installer_entry.thread_polling.join()
 
 def entry_install(installer_entry, entry, conf):
   installer_entry.net_sniffer_mac_addresses[conf['mac_address'].upper()] = { 'entry_id': entry.id, 'momentary': 'net_connection_momentary' in conf and conf['net_connection_momentary'], 'connected': False, 'last_seen': 0, 'last_published': 0, 'last_ip_address': None}
@@ -102,104 +116,17 @@ def entry_install(installer_entry, entry, conf):
     },
   })
 
-def start(entry):
-  if not system.test_mode and entry.config['use_iw']:
-    entry.thread_iwevent = threading.Thread(target = _iwevent_thread, args = [entry], daemon = True)
-    entry.thread_iwevent._destroyed = False
-    entry.thread_iwevent.start()
+def start(installer_entry):
+  for h in installer_entry.net_sniffer_all_handlers:
+    if (h + '_start') in globals():
+      globals()[h + '_start'](installer_entry)
 
 def run(installer_entry):
-  if installer_entry.config['use_iw']:
-    _iwdev_run(installer_entry)
-  if installer_entry.config['use_ip_neigh']:
-    _ip_neigh_run(installer_entry)
-
-def _iwevent_thread(installer_entry):
-  logging.debug("#{id}> starting iw event polling ...".format(id = installer_entry.id))
-  installer_entry.thread_iwevent_proc = subprocess.Popen(installer_entry.config['iw_event_command'].split(' '), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text = True)
+  env = {}
+  for h in installer_entry.config['polling_handler']:
+    if (h + '_polling_run') in globals():
+      globals()[h + '_polling_run'](installer_entry, env)
   
-  #try:
-  while installer_entry.thread_iwevent_proc.poll() is None:
-    _iwevent_process_line(installer_entry, str(installer_entry.thread_iwevent_proc.stdout.readline().strip()))
-  #except KeyboardInterrupt:
-  #  pass
-  #finally:
-  #  if installer_entry.thread_iwevent_proc:
-  #    installer_entry.thread_iwevent_proc.kill()
-  #    installer_entry.thread_iwevent_proc = None
-
-def _iwevent_thread_kill(installer_entry):
-  if installer_entry.thread_iwevent_proc:
-    installer_entry.thread_iwevent_proc.kill()
-    installer_entry.thread_iwevent_proc = None
-
-def _iwevent_process_line(installer_entry, line):
-  #logging.debug("#{id}> iw event line detected: {line}".format(id = installer_entry.id, line = line))
-  env = {}
-  m = re.search('(new|del) station.*([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})', line, re.IGNORECASE)
-  if m and (m.group(1) == 'new' or m.group(1) == 'del'):
-    mac_address_detected(installer_entry, env, m.group(2).upper(), m.group(1) == 'del', None, 'iw_event')
-
-def _iwdev_run(installer_entry):
-  env = {}
-  interfaces = subprocess.check_output(installer_entry.config['iw_dev_command'], shell=True, stderr=subprocess.STDOUT).decode("utf-8")
-  for interface in interfaces.split("\n"):
-    mac_addresses = subprocess.check_output(installer_entry.config['iw_station_dump_command'].replace("{INTERFACE}", interface.strip()), shell=True, stderr=subprocess.STDOUT).decode("utf-8")
-    for mac_address in mac_addresses.split("\n"):
-      if re.search('^([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})$', mac_address.strip(), re.IGNORECASE):
-        mac_address_detected(installer_entry, env, mac_address.strip().upper(), False, None, 'iw_dump')
-
-#def _arp_run(installer_entry):
-#  env = {}
-#  l = _arp_list(installer_entry)
-#  for mac_address in l:
-#    mac_address_detected(installer_entry, env, mac_address, True, l[mac_address], 'arp')
-
-def _arp_list(installer_entry):
-  logging.debug("#{id}> arp list fetching ...".format(id = installer_entry.id))
-  ret = {}
-  with open(installer_entry.config['arp_location'], 'r') as f:
-    output = f.read()
-  for line in output.split("\n"):
-    r = _arp_process_line(line.strip())
-    if r:
-      ret[r[0]] = r[1]
-  return ret
-
-def _arp_process_line(line):
-  m = re.search('([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})?.*([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})', line, re.IGNORECASE)
-  return [m.group(2).upper(), m.group(1)] if m else None
-
-def _ip_neigh_run(installer_entry):
-  logging.debug("#{id}> ip neigh fetching ...".format(id = installer_entry.id))
-  env = {}
-  result = subprocess.check_output(installer_entry.config['ip_neigh_command'], shell=True, stderr=subprocess.STDOUT).decode("utf-8")
-  for line in result.split("\n"):
-    r = __ip_neigh_process_line(line)
-    if r and r['mac_address'] and r['mac_address'] in installer_entry.net_sniffer_mac_addresses:
-      # if REACHABLE, the entry is considered running, so i can set it as detected
-      if r['state'] == 'REACHABLE':
-        mac_address_detected(installer_entry, env, r['mac_address'], False, r['ipv4'], 'ip_neigh')
-      # if STALE or DELAY i check if it has been detected by other methods. If not, and ping is available, let's try pinging it
-      elif (r['state'] == 'STALE' or r['state'] == 'DELAY') and (installer_entry.config['use_ping_command'] or installer_entry.config['use_ping_module']) and system.time() - installer_entry.net_sniffer_mac_addresses[r['mac_address']]['last_seen'] > utils.read_duration(installer_entry.config['connection_time']):
-        mac_address_detected(installer_entry, env, r['mac_address'], not _ping(installer_entry, r['ipv4'] if r['ipv4'] else r['ipv6']), r['ipv4'], 'ip_neigh_ping')
-
-def __ip_neigh_process_line(line):
-  # IPV4|IPV6 "dev" INTERFACE ["lladdr" MAC_ADDRESS_LOWECASE] "STALE|DELAY|REACHABLE|FAILED"
-  # Ex: 192.168.2.234 dev wlan1-1 lladdr a8:03:2a:bc:71:58 STALE|DELAY|REACHABLE
-  # Ex: fe80::32b5:c2ff:fe4f:d116 dev br-lan  FAILED
-  m = re.search('^\s*(([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})|([0-9a-f]+(:+[0-9a-f]+)*))\s+dev\s+([a-z0-9-]+)\s+(lladdr ([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})\s+)?([a-z]+)\s*$', line, re.IGNORECASE)
-  return {"ipv4": m.group(2), "ipv6": m.group(3), "iface": m.group(5), "mac_address": m.group(7).upper() if m.group(7) else None, "state": m.group(8)} if m else None
-
-def _ping(installer_entry, ip):
-  # WARN Used also in net.module (@see entry.config['wan-connected-check-method'] == 'ping'), should be unified
-  if installer_entry.config['use_ping_command']:
-    response = subprocess.run(installer_entry.config['ping_command'].split(' ') + [ip], capture_output = True)
-    logging.debug("#{id}> pinged {ip}: {response}".format(id = installer_entry.id, ip = ip, response = response))
-    return response.returncode == 0
-  if installer_entry.config['use_ping_module']:
-    return node.entries_invoke('ping', ip)
-
 def mac_address_detected(installer_entry, env, mac_address, disconnected = False, ip_address = None, method = None):
   if mac_address in installer_entry.net_sniffer_mac_addresses:
     logging.debug("#{id}> mac_address_detected: {mac_address}, connected: {connected}, ip_address: {ip_address}, method: {method}".format(id = installer_entry.id, mac_address = mac_address, connected = not disconnected, ip_address = ip_address, method = method))
@@ -230,11 +157,8 @@ def mac_address_detected(installer_entry, env, mac_address, disconnected = False
       
       if publish:
         data = { 'mac_address': mac_address, 'was_connected': was_connected, 'method': method }
-        if not disconnected and not ip_address and installer_entry.config['use_arp']:
-          if 'arp_list' not in env:
-            env['arp_list'] = _arp_list(installer_entry)
-          if mac_address in env['arp_list']:
-            ip_address = env['arp_list'][mac_address]
+        if not disconnected and not ip_address:
+          ip_address = ip_address_get(installer_entry, env, mac_address)
         data['ip_address'] = ip_address
         if publish == '@/disconnected' and installer_entry.net_sniffer_mac_addresses[mac_address]['last_ip_address']:
           data['prev_ip_address'] = installer_entry.net_sniffer_mac_addresses[mac_address]['last_ip_address']
@@ -242,7 +166,15 @@ def mac_address_detected(installer_entry, env, mac_address, disconnected = False
         installer_entry.net_sniffer_mac_addresses[mac_address]['last_ip_address'] = ip_address
         installer_entry.net_sniffer_mac_addresses[mac_address]['last_published'] = system.time()
 
-def _thread_checker(installer_entry):
+def ip_address_get(installer_entry, env, mac_address):
+  for h in installer_entry.config['ip_get_handler']:
+    if (h + '_ip_get') in globals():
+      r = globals()[h + '_ip_get'](installer_entry, env, mac_address)
+      if r:
+        return r
+  return None
+
+def _thread_polling(installer_entry):
   while not threading.currentThread()._destroyed:
     status_check(installer_entry)
     system.sleep(utils.read_duration(installer_entry.config['connection_time']) / 10)
@@ -261,6 +193,150 @@ def status_check(installer_entry):
         entry.publish('@/disconnected', data)
         
         logging.debug("#{id}> {entry}: status_check, res: disconnected".format(id = installer_entry.id, entry = entry.id))
+
+
+
+
+###############################################################################
+# IW
+# Pro: events for real time monitor
+# Cons: only wifi, no IP addresses, don't detect stale connections
+###############################################################################
+
+def iw_init(installer_entry):
+  if not system.test_mode and 'iw' in installer_entry.config['event_monitor_handler']:
+    installer_entry.thread_iwevent = None
+    installer_entry.thread_iwevent_proc = None
+
+def iw_destroy(installer_entry):
+  if not system.test_mode and 'iw' in installer_entry.config['event_monitor_handler']:
+    _iwevent_thread_kill(installer_entry)
+    if installer_entry.thread_iwevent and not installer_entry.thread_iwevent._destroyed:
+      installer_entry.thread_iwevent._destroyed = True
+      installer_entry.thread_iwevent.join()
+
+def iw_start(installer_entry):
+  if not system.test_mode and 'iw' in installer_entry.config['event_monitor_handler']:
+    installer_entry.thread_iwevent = threading.Thread(target = _iwevent_thread, args = [installer_entry], daemon = True)
+    installer_entry.thread_iwevent._destroyed = False
+    installer_entry.thread_iwevent.start()
+
+def _iwevent_thread(installer_entry):
+  logging.debug("#{id}> starting iw event polling ...".format(id = installer_entry.id))
+  installer_entry.thread_iwevent_proc = subprocess.Popen(installer_entry.config['iw_event_command'].split(' '), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text = True)
+  
+  #try:
+  while installer_entry.thread_iwevent_proc.poll() is None:
+    _iwevent_process_line(installer_entry, str(installer_entry.thread_iwevent_proc.stdout.readline().strip()))
+  #except KeyboardInterrupt:
+  #  pass
+  #finally:
+  #  if installer_entry.thread_iwevent_proc:
+  #    installer_entry.thread_iwevent_proc.kill()
+  #    installer_entry.thread_iwevent_proc = None
+
+def _iwevent_thread_kill(installer_entry):
+  if installer_entry.thread_iwevent_proc:
+    installer_entry.thread_iwevent_proc.kill()
+    installer_entry.thread_iwevent_proc = None
+
+def _iwevent_process_line(installer_entry, line):
+  #logging.debug("#{id}> iw event line detected: {line}".format(id = installer_entry.id, line = line))
+  env = {}
+  m = re.search('(new|del) station.*([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})', line, re.IGNORECASE)
+  if m and (m.group(1) == 'new' or m.group(1) == 'del'):
+    mac_address_detected(installer_entry, env, m.group(2).upper(), m.group(1) == 'del', None, 'iw_event')
+
+def iw_polling_run(installer_entry, env):
+  interfaces = subprocess.check_output(installer_entry.config['iw_dev_command'], shell=True, stderr=subprocess.STDOUT).decode("utf-8")
+  for interface in interfaces.split("\n"):
+    mac_addresses = subprocess.check_output(installer_entry.config['iw_station_dump_command'].replace("{INTERFACE}", interface.strip()), shell=True, stderr=subprocess.STDOUT).decode("utf-8")
+    for mac_address in mac_addresses.split("\n"):
+      if re.search('^([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})$', mac_address.strip(), re.IGNORECASE):
+        mac_address_detected(installer_entry, env, mac_address.strip().upper(), False, None, 'iw_dump')
+
+
+
+###############################################################################
+# ARP
+# Pro: ip addresses, wifi+wired connections
+# Cons: no events for real time monitoring, don't detect stale connections
+###############################################################################
+
+def arp_ip_get(installer_entry, env, mac_address):
+  if 'arp_list' not in env:
+    env['arp_list'] = _arp_list(installer_entry)
+  if mac_address in env['arp_list']:
+    return env['arp_list'][mac_address]
+
+#def _arp_run(installer_entry):
+#  env = {}
+#  l = _arp_list(installer_entry)
+#  for mac_address in l:
+#    mac_address_detected(installer_entry, env, mac_address, True, l[mac_address], 'arp')
+
+def _arp_list(installer_entry):
+  logging.debug("#{id}> arp list fetching ...".format(id = installer_entry.id))
+  ret = {}
+  with open(installer_entry.config['arp_location'], 'r') as f:
+    output = f.read()
+  for line in output.split("\n"):
+    r = _arp_process_line(line.strip())
+    if r:
+      ret[r[0]] = r[1]
+  return ret
+
+def _arp_process_line(line):
+  m = re.search('([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})?.*([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})', line, re.IGNORECASE)
+  return [m.group(2).upper(), m.group(1)] if m else None
+
+
+
+
+###############################################################################
+# IP NEIGH
+# Pro: ip addresses, wifi+wired connections, detect stale connections (but should be checked via ping or other methods)
+# Cons: no events for real time monitoring
+###############################################################################
+
+def ip_neigh_polling_run(installer_entry, env):
+  logging.debug("#{id}> ip neigh fetching ...".format(id = installer_entry.id))
+  result = subprocess.check_output(installer_entry.config['ip_neigh_command'], shell=True, stderr=subprocess.STDOUT).decode("utf-8")
+  for line in result.split("\n"):
+    r = __ip_neigh_process_line(line)
+    if r and r['mac_address'] and r['mac_address'] in installer_entry.net_sniffer_mac_addresses:
+      # if REACHABLE, the entry is considered running, so i can set it as detected
+      if r['state'] == 'REACHABLE':
+        mac_address_detected(installer_entry, env, r['mac_address'], False, r['ipv4'], 'ip_neigh')
+      # if STALE or DELAY i check if it has been detected by other methods. If not, and ping is available, let's try pinging it
+      elif (r['state'] == 'STALE' or r['state'] == 'DELAY') and (installer_entry.config['use_ping_command'] or installer_entry.config['use_ping_module']) and system.time() - installer_entry.net_sniffer_mac_addresses[r['mac_address']]['last_seen'] > utils.read_duration(installer_entry.config['connection_time']):
+        mac_address_detected(installer_entry, env, r['mac_address'], not _ping(installer_entry, r['ipv4'] if r['ipv4'] else r['ipv6']), r['ipv4'], 'ip_neigh_ping')
+
+def __ip_neigh_process_line(line):
+  # IPV4|IPV6 "dev" INTERFACE ["lladdr" MAC_ADDRESS_LOWECASE] "STALE|DELAY|REACHABLE|FAILED"
+  # Ex: 192.168.2.234 dev wlan1-1 lladdr a8:03:2a:bc:71:58 STALE|DELAY|REACHABLE
+  # Ex: fe80::32b5:c2ff:fe4f:d116 dev br-lan  FAILED
+  m = re.search('^\s*(([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})|([0-9a-f]+(:+[0-9a-f]+)*))\s+dev\s+([a-z0-9-]+)\s+(lladdr ([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})\s+)?([a-z]+)\s*$', line, re.IGNORECASE)
+  return {"ipv4": m.group(2), "ipv6": m.group(3), "iface": m.group(5), "mac_address": m.group(7).upper() if m.group(7) else None, "state": m.group(8)} if m else None
+
+
+
+
+
+###############################################################################
+# PING
+###############################################################################
+
+def _ping(installer_entry, ip):
+  # WARN Used also in net.module (@see entry.config['wan-connected-check-method'] == 'ping'), should be unified
+  if installer_entry.config['use_ping_command']:
+    response = subprocess.run(installer_entry.config['ping_command'].split(' ') + [ip], capture_output = True)
+    logging.debug("#{id}> pinged {ip}: {response}".format(id = installer_entry.id, ip = ip, response = response))
+    return response.returncode == 0
+  if installer_entry.config['use_ping_module']:
+    return node.entries_invoke('ping', ip)
+
+
 
 #############################
 # CLI execution for testing purpose
