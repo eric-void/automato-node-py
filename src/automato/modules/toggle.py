@@ -63,6 +63,10 @@ POSSIBILI PROBLEMI DI QUESTA SITUAZIONE:
   (caso pratico: è giusto che per ogni action "output-set" che faccio su shelly riceva un evento "output", ma se ricevo un evento "input" significa che si è fisicamente schiacciato il pulsante, e quindi andrebbe considerato).
   Questo problema è mitigato dal fatto che comunque c'è un timeout basso in mezzo, e che se il device fa tutto come deve (per ogni output-set manda un output), alla fine non dovrebbe saltare nulla.
 
+20220505 Ora toggle_debounce_time viene usato anche per decidere se deve reinizializzare un timer (di default) dopo che il device ripropone lo stesso stato precedente:
+In pratica poteva capitare che io (via programmatica/mqtt) accendevo un timer specificando un orario
+Quindi il device mi mandava un feedback della richiesta di ON, e questo veniva preso come ULTERIORE set, questa volta però utilizzando il timer di default (che quindi eliminava il timer corretto)
+Vedi i test "timer-debounce"
 """
 
 definition = {
@@ -256,6 +260,7 @@ def _on_set(entry, payload, source_entry = None):
     # if "timer-to" is present in direct payload, it has priority over "timer-to-X" in defaults
     if "timer-to" in payload and "timer-to-" + str(payload['state']) not in payload:
       payload["timer-to-" + str(payload['state'])] = payload["timer-to"]
+    set_timer_to = "timer-to-" + str(payload['state']) in payload
     # Apply defaults (runtime level + definition level)
     if 'toggle_defaults' in entry.data:
       payload = { ** entry.data['toggle_defaults'], ** payload }
@@ -263,17 +268,19 @@ def _on_set(entry, payload, source_entry = None):
       payload = { ** entry.config['toggle_defaults'], ** payload }
       
     entry.data['toggle_input_values']['_mqtt' if source_entry is None else source_entry.id] = [payload['state'], system.time()]
-    set_output(entry, payload['state'], source_entry)
-    
-    # Manage timers
-    if 'timer-to-' + str(payload['state']) in payload and utils.read_duration(payload['timer-to-' + str(payload['state'])]) > 0:
-      payload['timer-to'] = payload['timer-to-' + str(payload['state'])]
-    if 'timer-to' in payload:
-      payload['timer-to'] = utils.read_duration(payload['timer-to'])
-      if payload['timer-to'] > 0:
-        if payload['timer-to'] < 1000000000:
-          payload['timer-to'] = system.time() + payload['timer-to']
-        toggle_init_timer(entry, payload['timer-to'], 1 - payload['state'])    
+    changed = set_output(entry, payload['state'], source_entry)
+      
+    # Manage timers: only if timer_to was setted in the call or output value changed or passed at least toggle_debounce_time from last output set
+    # So: i consider a default timer_to only if output value is changed or is passed enough time from last set (to avoid problems if a device sends an output feedback just after a trigger)
+    if set_timer_to or changed or system.time() - entry.data['toggle_output_value_time'] > entry.data['toggle_debounce_time']:
+      if 'timer-to-' + str(payload['state']) in payload and utils.read_duration(payload['timer-to-' + str(payload['state'])]) > 0:
+        payload['timer-to'] = payload['timer-to-' + str(payload['state'])]
+      if 'timer-to' in payload:
+        payload['timer-to'] = utils.read_duration(payload['timer-to'])
+        if payload['timer-to'] > 0:
+          if payload['timer-to'] < 1000000000:
+            payload['timer-to'] = system.time() + payload['timer-to']
+          toggle_init_timer(entry, payload['timer-to'], 1 - payload['state'])
     
   entry.run_publish('@')
 
@@ -283,7 +290,7 @@ def set_output(entry, value, source_entry = None):
     for q in entry.data['toggle_output_queue']:
       if q[1] == source_entry.id and value == q[2]:
         entry.data['toggle_output_queue'].remove(q)
-        return
+        return False
 
   if value != entry.data['toggle_output_value'] or entry.data['toggle_output_value_time'] == 0:
     toggle_cancel_timer(entry)
@@ -298,8 +305,10 @@ def set_output(entry, value, source_entry = None):
     entry.data['toggle_output_value'] = value
     entry.data['toggle_output_value_time'] = system.time()
     entry.data['toggle_changed'] = True
+    return True
   else:
     entry.data['toggle_changed'] = False
+    return False
 
 def on_toggle(entry, subscribed_message):
   payload2 = { 'state': 1 - entry.data['toggle_output_value']}

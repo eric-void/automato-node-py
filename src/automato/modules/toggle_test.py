@@ -139,6 +139,7 @@ def test_run(entries):
     assertEventsTopic = 'item/test-toggle', assertEvents = { 'output': { 'value': 1, 'timer_to': ('d', system.time() + 10 ) } }
   )
   
+  system.time_offset(5) # To avoid toggle_debounce_time for timer management (for this test i want timer to be re-initialized, even if output not changed). See timer-debounce tests below
   # I need to simulate input button changed to on: so next test could switch if off - if i don't do this, next "device/toggle-status=off" i useless (it's already "off)
   test.assertPublish('device-on', 'device/toggle-status', { 'value': 'on', 'time': system.time() }, 
     assertSubscribeSomePayload = {'item/test-toggle': {'state': 1, 'timer-to': ('d', system.time() + 10 ), 'type': 'toggle', 'changed': False}},
@@ -158,6 +159,7 @@ def test_run(entries):
   test.assertAction('set-on-action', 'test-toggle', 'output-set', { 'value': 1 },
     assertSubscribe = {'item/test-toggle/set': { 'state': 1 }})
   
+  system.time_offset(5) # To avoid toggle_debounce_time for timer management (for this test i want timer to be re-initialized, even if output not changed). See timer-debounce tests below
   # I need to simulate input button changed to on: so next test could switch if off - if i don't do this, next "device/toggle-status=off" i useless (it's already "off)
   test.assertPublish('device-on2', 'device/toggle-status', { 'value': 'on', 'time': system.time() }, assertSubscribeSomePayload = {'item/test-toggle': {'state': 1, 'timer-to': ('d', system.time() + 10 ), 'type': 'toggle', 'changed': False}})
   
@@ -231,3 +233,16 @@ def test_run(entries):
   test.assertPublish('debounce4', 'device3/toggle-status', {'value': 'off'}, 
     assertSubscribeSomePayload = {'item/test-toggle3': {'state': 0 }})
 
+  # Test setting an output with a specific timer, then device resend it before toggle_debounce_time (no output change => no timer should be set)
+  system.time_offset(5)
+  test.assertPublish('timer-debounce-0', 'device/toggle-status', { 'value': 'off', 'time': system.time() }, assertSubscribe = {
+    'item/test-toggle': {"state": 0, "type": "toggle", "changed": True, "last_changed": ('d', system.time()), "timer-state": 1, "timer-to": ('d', system.time() + 1), "defaults": {"timer-to-1": 1, "timer-to-0": 1}, "time": ('d', system.time()), "output_values": {"test-toggle-device@TEST": 0}, "input_values": {"test-toggle-device@TEST": [0, ('d', system.time())], "_mqtt": ()}}
+  })
+  t = system.time()
+  test.assertPublish('timer-debounce-1', 'item/test-toggle/set', {"state": 1, "timer-to": 28800000}, assertSubscribe = {
+    'device/toggle': 'on',
+    'item/test-toggle': {"state": 1, "type": "toggle", "changed": True, "last_changed": ('d', t), "timer-state": 1, "timer-to": ('d', t + 28800000), "defaults": {"timer-to-1": 1, "timer-to-0": 1}, "time": ('d', system.time()), "output_values": {"test-toggle-device@TEST": 1}, "input_values": {"test-toggle-device@TEST": (), "_mqtt": ()}}
+  })
+  test.assertPublish('timer-debounce-2', 'device/toggle-status', { 'value': 'on', 'time': system.time() }, assertSubscribe = {
+    'item/test-toggle': {"state": 1, "type": "toggle", "changed": False, "last_changed": ('d', t), "timer-state": 1, "timer-to": ('d', t + 28800000), "defaults": {"timer-to-1": 1, "timer-to-0": 1}, "time": ('d', system.time()), "output_values": {"test-toggle-device@TEST": 1}, "input_values": {"test-toggle-device@TEST": [1, system.time()], "_mqtt": ()}}
+  })
