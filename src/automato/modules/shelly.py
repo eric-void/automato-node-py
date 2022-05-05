@@ -92,6 +92,19 @@ def entry_install(installer_entry, entry, conf):
     definition_extra['events']['output:init'] = {'port:def': t['output_port:def'], 'value:def': t['relay:def'], 'intensity:def': 'int', 'intensity:def:limits': [1, 100] }
 
   if 'input:def' in t:
+    """
+    Example of "longpush" for gen1 device:
+    shellies/shelly1-XXXXXX/input/0 = b'1' > EVENT EMITTED with no channel
+    shellies/shelly1-XXXXXX/longpush/0 = b'1' > EVENT EMITTED with channel "longpush" and temporary = true
+    shellies/shelly1-XXXXXX/input_event/0 = b'{"event":"L","event_cnt":247}' > IGNORED
+    shellies/shelly1-XXXXXX/input/0 = b'0' > EVENT EMITTED with no channel
+
+    Example of simple push:
+    shellies/shelly1-XXXXXX/input/0 = b'1'
+    shellies/shelly1-XXXXXX/longpush/0 = b'0'
+    shellies/shelly1-XXXXXX/input_event/0 = b'{"event":"S","event_cnt":197}'
+    shellies/shelly1-XXXXXX/input/0 = b'0
+    """
     definition_extra['publish']['input'] = {
       'topic': '/^' + base_topic + 'input/([0-9]+)$/',
       'description': _('Status of the input pin of the device'),
