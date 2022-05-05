@@ -144,7 +144,7 @@ def presence_method_gone_away(entry, name, method, delete_after = 0):
   if d > 0:
     exports(entry)
   else:
-    logging.debug("{id}> {name} removed method ({method} => {methods})".format(id = entry.id, name = name, method = method, methods = list(entry.data['presence'][name]['methods'])))
+    logging.debug("{id}> {name} removed method ({method} => {methods})".format(id = entry.id, name = name, method = method, methods = list(entry.data['presence'][name]['methods']) if name in entry.data['presence'] else '-'))
   return d > 0
 
 def presence_check_sessions(entry):
