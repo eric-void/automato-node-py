@@ -21,4 +21,4 @@ def ping(entry, ip):
     logging.debug("#{id}> pinged {ip}, is_alive: {is_alive}".format(id = entry.id, ip = ip, is_alive = h.is_alive))
     return h.is_alive
   except:
-    logging.exception("#{id}> failed executing ping".format(id = entry.id))
+    logging.exception("#{id}> failed executing ping {ip}".format(id = entry.id, ip = ip))
