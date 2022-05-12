@@ -23,7 +23,7 @@ definition = {
     #"presence_home_location": { "latitude": 0, "longitude": 0, "radius": 1000 },
     #"presence_home_regions": [ "home", "Casa" ],
     "presence_location_session_duration": "15m",
-    "presence_connection_duration": "15m", # at least "send_connect_message_every" in net_sniffer_iw
+    "presence_connection_duration": "15m", # at least "send_connect_message_every" in net_sniffer
     "presence_connection_after_disconnect": "5m",
   },
   

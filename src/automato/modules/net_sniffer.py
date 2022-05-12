@@ -46,6 +46,14 @@ definition = {
   
   'run_interval': 60, # = polling interval
 }
+"""
+entry.definition = {
+  'net_sniffer_ping': True, # Force ping when there is no confidence over current connection
+  'net_sniffer_ignore_handler_confidence': True, # If true, do not trust confidence given by handler
+  'net_sniffer_confidence_timeout': '15m', # Override confidence timeout for this entry
+}
+"""
+
 
 def load(installer_entry):
   installer_entry.net_sniffer_mac_addresses = {} # mac_address:{ 'entry_id': STR, 'momentary': BOOL, 'connected': BOOL, 'last_seen': TIMESTAMP, 'last_seen_confidence': TIMESTAMP, 'last_published': TIMESTAMP, 'last_ip_address': [STR] }
@@ -163,6 +171,8 @@ def mac_address_detected(installer_entry, env, mac_address, connected = True, co
       was_connected = installer_entry.net_sniffer_mac_addresses[mac_address]['connected']
       last_seen = installer_entry.net_sniffer_mac_addresses[mac_address]['last_seen']
       last_seen_confidence = installer_entry.net_sniffer_mac_addresses[mac_address]['last_seen_confidence']
+      if 'net_sniffer_ignore_handler_confidence' in entry.definition and entry.definition['net_sniffer_ignore_handler_confidence']:
+        confidence = False
       ping = entry.definition['net_sniffer_ping'] if 'net_sniffer_ping' in entry.definition else (
         (
           installer_entry.net_sniffer_all_handlers[handler]['event_monitor_ping'] if event_monitor and 'event_monitor_ping' in installer_entry.net_sniffer_all_handlers[handler] else 

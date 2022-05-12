@@ -8,7 +8,7 @@ def test_init():
   test.add_node_config({
     "entries": [
       {
-        "module": "net_sniffer_iw",
+        "module": "net_sniffer",
         "config": {
           "momentary_flood_time": 30,
           "connection_time": 5,
@@ -31,25 +31,25 @@ def test_init():
 
 def test_run(entries):
   test.assertx('t1', assertSubscribe = {'device/device1/connected': {'mac_address': '01:02:03:04:05:06', 'ip_address': None, 'was_connected': False, 'handler': 'iw_monitor'}}, assertEventsTopic = 'device/device1/connected', assertEvents = {'connected': {'value': 1, 'mac_address': '01:02:03:04:05:06', 'ip_address': None, 'was_connected': False, 'handler': 'iw_monitor' }}, wait = False)
-  entries['net_sniffer_iw@TEST'].module._iwevent_process_line(entries['net_sniffer_iw@TEST'], 'new station 01:02:03:04:05:06')
+  entries['net_sniffer@TEST'].module._iwevent_process_line(entries['net_sniffer@TEST'], 'new station 01:02:03:04:05:06')
   test.waitRunning()
   test.assertx('t2', assertSubscribe = {'device/device2/detected': {'mac_address': '0A:0B:0C:0D:0E:0F', 'ip_address': None, 'was_connected': False, 'handler': 'iw_monitor'}}, assertEventsTopic = 'device/device2/detected', assertEvents = {'connected': {'value': 1, 'temporary': True, 'mac_address': '0A:0B:0C:0D:0E:0F', 'ip_address': None, 'was_connected': False, 'handler': 'iw_monitor' }}, wait = False)
-  entries['net_sniffer_iw@TEST'].module._iwevent_process_line(entries['net_sniffer_iw@TEST'], 'new station 0A:0B:0C:0D:0E:0F')
+  entries['net_sniffer@TEST'].module._iwevent_process_line(entries['net_sniffer@TEST'], 'new station 0A:0B:0C:0D:0E:0F')
   test.waitRunning()
   # Test disconnection by timeout (connection_time)
   test.assertx('t3', assertSubscribe = {'device/device1/disconnected': {'mac_address': '01:02:03:04:05:06', 'ip_address': None, 'was_connected': True, 'handler': 'timeout'}}, assertEventsTopic = 'device/device1/disconnected', assertEvents = {'connected': {'value': 0, 'mac_address': '01:02:03:04:05:06', 'ip_address': None, 'was_connected': True, 'handler': 'timeout' }}, timeoutms = 6000)
   # Test "momentary_flood_time"
   test.assertx('t4', assertSubscribeNotReceive = {'device/device2/detected': ''}, wait = False)
-  entries['net_sniffer_iw@TEST'].module._iwevent_process_line(entries['net_sniffer_iw@TEST'], 'new station 0A:0B:0C:0D:0E:0F')
+  entries['net_sniffer@TEST'].module._iwevent_process_line(entries['net_sniffer@TEST'], 'new station 0A:0B:0C:0D:0E:0F')
   test.waitRunning()
   
-  x = entries['net_sniffer_iw@TEST'].module._arp_process_line("192.168.1.199    0x1         0x0         01:02:03:04:05:06     *        br-lan")
+  x = entries['net_sniffer@TEST'].module._arp_process_line("192.168.1.199    0x1         0x0         01:02:03:04:05:06     *        br-lan")
   test.assertx('t5', assertEq = [(x, ['01:02:03:04:05:06', '192.168.1.199'])])
   env = { 'arp_list': {x[0]: x[1]} }
   
   test.assertx('t6', assertSubscribe = {'device/device1/connected': {'mac_address': '01:02:03:04:05:06', 'ip_address': '192.168.1.199', 'was_connected': False, 'handler': 'test_polling'}}, assertEventsTopic = 'device/device1/connected', assertEvents = {'connected': {'value': 1, 'ip_address': '192.168.1.199', 'mac_address': '01:02:03:04:05:06', 'was_connected': False, 'handler': 'test_polling' }}, wait = False)
-  entries['net_sniffer_iw@TEST'].module.mac_address_detected(entries['net_sniffer_iw@TEST'], env, '01:02:03:04:05:06', connected = True, confidence = True, ip_address = None, handler = 'test', event_monitor = False)
+  entries['net_sniffer@TEST'].module.mac_address_detected(entries['net_sniffer@TEST'], env, '01:02:03:04:05:06', connected = True, confidence = True, ip_address = None, handler = 'test', event_monitor = False)
   test.waitRunning()
   test.assertx('t7', assertSubscribe = {'device/device1/disconnected': {'mac_address': '01:02:03:04:05:06', 'ip_address': None, 'prev_ip_address': '192.168.1.199', 'was_connected': True, 'handler': 'test_polling'}}, assertEventsTopic = 'device/device1/disconnected', assertEvents = {'connected': {'value': 0, 'mac_address': '01:02:03:04:05:06', 'ip_address': None, 'prev_ip_address': '192.168.1.199', 'was_connected': True, 'handler': 'test_polling' }}, wait = False)
-  entries['net_sniffer_iw@TEST'].module.mac_address_detected(entries['net_sniffer_iw@TEST'], env, '01:02:03:04:05:06', connected = False, confidence = True, ip_address = None, handler = 'test', event_monitor = False)
+  entries['net_sniffer@TEST'].module.mac_address_detected(entries['net_sniffer@TEST'], env, '01:02:03:04:05:06', connected = False, confidence = True, ip_address = None, handler = 'test', event_monitor = False)
   test.waitRunning()
