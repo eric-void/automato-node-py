@@ -160,21 +160,30 @@ def mac_address_detected(installer_entry, env, mac_address, connected = True, co
     #logging.debug("#{id}> mac_address_detected: {mac_address}, connected: {connected}, confidence: {confidence}, ip_address: {ip_address}, handler: {handler}".format(id = installer_entry.id, mac_address = mac_address, connected = connected, confidence = confidence, ip_address = ip_address, handler = (handler + ('[MONITOR]' if event_monitor else '[POLLING]')) if handler else '-'))
     entry = system.entry_get(installer_entry.net_sniffer_mac_addresses[mac_address]['entry_id'])
     if entry:
-      if connected and not confidence and ip_address:
-        ping = entry.definition['net_sniffer_ping'] if 'net_sniffer_ping' in entry.definition else (
-          (
-            installer_entry.net_sniffer_all_handlers[handler]['event_monitor_ping'] if event_monitor and 'event_monitor_ping' in installer_entry.net_sniffer_all_handlers[handler] else 
-            (installer_entry.net_sniffer_all_handlers[handler]['polling_ping'] if not event_monitor and 'polling_ping' in installer_entry.net_sniffer_all_handlers[handler] else False)
-          ) if handler and handler in installer_entry.net_sniffer_all_handlers else False)
-        if ping:
+      was_connected = installer_entry.net_sniffer_mac_addresses[mac_address]['connected']
+      last_seen = installer_entry.net_sniffer_mac_addresses[mac_address]['last_seen']
+      last_seen_confidence = installer_entry.net_sniffer_mac_addresses[mac_address]['last_seen_confidence']
+      ping = entry.definition['net_sniffer_ping'] if 'net_sniffer_ping' in entry.definition else (
+        (
+          installer_entry.net_sniffer_all_handlers[handler]['event_monitor_ping'] if event_monitor and 'event_monitor_ping' in installer_entry.net_sniffer_all_handlers[handler] else 
+          (installer_entry.net_sniffer_all_handlers[handler]['polling_ping'] if not event_monitor and 'polling_ping' in installer_entry.net_sniffer_all_handlers[handler] else False)
+        ) if handler and handler in installer_entry.net_sniffer_all_handlers else False)
+
+      if ping and connected and not confidence:
+        if ip_address:
           confidence_timeout = utils.read_duration(entry.definition['net_sniffer_confidence_timeout']) if 'net_sniffer_confidence_timeout' in entry.definition else utils.read_duration(installer_entry.config['confidence_timeout'])
           if system.time() - installer_entry.net_sniffer_mac_addresses[mac_address]['last_seen_confidence'] > confidence_timeout:
             logging.debug("#{id}> {entry}: no confidence on {mac_address} connection, try pinging it ...".format(id = installer_entry.id, entry = entry.id, mac_address = mac_address))
             connected = _ping(installer_entry, ip_address)
             confidence = True
+        else:
+          # If config requires ping for this entry, and ip_address is not available, ignore the detection
+          return
       
-      was_connected = installer_entry.net_sniffer_mac_addresses[mac_address]['connected']
-      last_seen = installer_entry.net_sniffer_mac_addresses[mac_address]['last_seen']
+      # If the entry was disconnected WITH CONFIDENCE, only a connection with confidence is considered
+      if connected and not confidence and not was_connected and last_seen_confidence == last_seen:
+        return
+      
       installer_entry.net_sniffer_mac_addresses[mac_address]['last_seen'] = system.time()
       if confidence:
         installer_entry.net_sniffer_mac_addresses[mac_address]['last_seen_confidence'] = system.time()
@@ -196,7 +205,7 @@ def mac_address_detected(installer_entry, env, mac_address, connected = True, co
         if not ip_address and installer_entry.net_sniffer_mac_addresses[mac_address]['last_ip_address']:
           ip_address = installer_entry.net_sniffer_mac_addresses[mac_address]['last_ip_address']
 
-      logging.debug("#{id}> {entry}: mac_address_detected, res: {publish}, mac: {mac_address}, connected: {connected}, confidence: {confidence}, ip_address: {ip_address}, momentary: {momentary}, was_connected: {was_connected}, last_seen: {last_seen}, handler: {handler}".format(id = installer_entry.id, entry = entry.id, publish = publish, mac_address = mac_address, connected = connected, confidence = confidence, ip_address = ip_address, momentary = installer_entry.net_sniffer_mac_addresses[mac_address]['momentary'], was_connected = was_connected, last_seen = last_seen, handler = (handler + ('[MONITOR]' if event_monitor else '[POLLING]')) if handler else '-'))
+      logging.debug("#{id}> {entry}: mac_address_detected, res: {publish}, mac: {mac_address}, connected: {connected}, confidence: {confidence}, ip_address: {ip_address}, momentary: {momentary}, was_connected: {was_connected}, last_seen: {last_seen}, last_seen_confidence: {last_seen_confidence}, handler: {handler}".format(id = installer_entry.id, entry = entry.id, publish = publish, mac_address = mac_address, connected = connected, confidence = confidence, ip_address = ip_address, momentary = installer_entry.net_sniffer_mac_addresses[mac_address]['momentary'], was_connected = was_connected, last_seen = last_seen, last_seen_confidence = last_seen_confidence, handler = (handler + ('_monitor' if event_monitor else '_polling')) if handler else '-'))
       
       if publish:
         data = { 'mac_address': mac_address, 'was_connected': was_connected, 'handler': (handler + ('_monitor' if event_monitor else '_polling')) if handler else None }
@@ -349,13 +358,13 @@ def ip_neigh_polling_run(installer_entry, conf, env):
     if r and r['mac_address'] and r['mac_address'] in installer_entry.net_sniffer_mac_addresses:
       # if REACHABLE, the entry is considered running, so i can set it as detected
       if r['state'] == 'REACHABLE':
-        mac_address_detected(installer_entry, env, r['mac_address'], connected = True, confidence = True, ip_address = ['ipv4'], handler = 'ip_neigh', event_monitor = False)
+        mac_address_detected(installer_entry, env, r['mac_address'], connected = True, confidence = True, ip_address = r['ipv4'], handler = 'ip_neigh', event_monitor = False)
       # FAILED state must be considered as a certain disconnection
       elif r['state'] == 'FAILED':
-        mac_address_detected(installer_entry, env, r['mac_address'], connected = False, confidence = True, ip_address = ['ipv4'], handler = 'ip_neigh', event_monitor = False)
+        mac_address_detected(installer_entry, env, r['mac_address'], connected = False, confidence = True, ip_address = r['ipv4'], handler = 'ip_neigh', event_monitor = False)
       # NONE, INCOMPLETE and PROBE states tells nothing so must be ignored. Other states must be considered as if the device is present, but no strong confidence about it
       elif r['state'] != 'NONE' and r['state'] != 'INCOMPLETE' and r['state'] != 'PROBE':
-        mac_address_detected(installer_entry, env, r['mac_address'], connected = True, confidence = False, ip_address = ['ipv4'], handler = 'ip_neigh', event_monitor = False)
+        mac_address_detected(installer_entry, env, r['mac_address'], connected = True, confidence = False, ip_address = r['ipv4'], handler = 'ip_neigh', event_monitor = False)
 
 def ip_neigh_ip_get(installer_entry, env, mac_address):
   if 'ip_neigh_list' not in env:
