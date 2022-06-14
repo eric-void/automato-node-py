@@ -51,6 +51,10 @@ definition = {
       'actions': {
         'output-set': 'js: "value" in params ? { "enabled": params["value"] ? true : false, "target": "port" in params ? params["port"] : "", "timer_to": "timer_to" in params ? params["timer_to"] : 0 } : null',
       }
+    },
+    '@/get': {
+      'type': 'none',
+      'publish': [ '@/status' ],
     }
   }
 }
