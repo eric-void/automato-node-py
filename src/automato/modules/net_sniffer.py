@@ -165,7 +165,8 @@ def run(installer_entry):
 """
 def mac_address_detected(installer_entry, env, mac_address, connected = True, confidence = False, ip_address = None, handler = None, event_monitor = False):
   if mac_address in installer_entry.net_sniffer_mac_addresses:
-    #logging.debug("#{id}> mac_address_detected: {mac_address}, connected: {connected}, confidence: {confidence}, ip_address: {ip_address}, handler: {handler}".format(id = installer_entry.id, mac_address = mac_address, connected = connected, confidence = confidence, ip_address = ip_address, handler = (handler + ('[MONITOR]' if event_monitor else '[POLLING]')) if handler else '-'))
+    if ip_address:
+      ip_address_set(env, mac_address, ip_address)
     entry = system.entry_get(installer_entry.net_sniffer_mac_addresses[mac_address]['entry_id'])
     if entry:
       was_connected = installer_entry.net_sniffer_mac_addresses[mac_address]['connected']
@@ -180,6 +181,8 @@ def mac_address_detected(installer_entry, env, mac_address, connected = True, co
         ) if handler and handler in installer_entry.net_sniffer_all_handlers else False)
 
       if ping and connected and not confidence:
+        if not ip_address:
+          ip_address = ip_address_get(installer_entry, env, mac_address)
         if ip_address:
           confidence_timeout = utils.read_duration(entry.definition['net_sniffer_confidence_timeout']) if 'net_sniffer_confidence_timeout' in entry.definition else utils.read_duration(installer_entry.config['confidence_timeout'])
           if system.time() - installer_entry.net_sniffer_mac_addresses[mac_address]['last_seen_confidence'] > confidence_timeout:
@@ -229,11 +232,19 @@ def mac_address_detected(installer_entry, env, mac_address, connected = True, co
         installer_entry.net_sniffer_mac_addresses[mac_address]['last_published'] = system.time()
 
 def ip_address_get(installer_entry, env, mac_address):
+  if 'ip' in env and mac_address in env['ip']:
+    return env['ip'][mac_address]
   for h in installer_entry.net_sniffer_ip_get_handlers:
     r = installer_entry.net_sniffer_all_handlers[h]['ip_get_callable'](installer_entry, env, mac_address)
     if r:
-      return r
-  return None
+      return ip_address_set(env, mac_address, r)
+  return ip_address_set(env, mac_address, None)
+
+def ip_address_set(env, mac_address, ip_address):
+  if 'ip' not in env:
+    env['ip'] = {}
+  env['ip'][mac_address] = ip_address
+  return ip_address
 
 def _thread_polling(installer_entry):
   while not threading.currentThread()._destroyed:
@@ -388,11 +399,16 @@ def ip_neigh_ip_get(installer_entry, env, mac_address):
     return env['ip_neigh_list'][mac_address]
 
 def __ip_neigh_process_line(line):
-  # IPV4|IPV6 "dev" INTERFACE ["lladdr" MAC_ADDRESS_LOWECASE] "STALE|DELAY|REACHABLE|FAILED"
+  # IPV4|IPV6 "dev" INTERFACE ["lladdr" MAC_ADDRESS_LOWECASE] [ref X] [used X/X/X] [probes X] "STALE|DELAY|REACHABLE|FAILED"
   # Ex: 192.168.2.234 dev wlan1-1 lladdr a8:03:2a:bc:71:58 STALE|DELAY|REACHABLE
   # Ex: fe80::32b5:c2ff:fe4f:d116 dev br-lan  FAILED
-  m = re.search('^\s*(([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})|([0-9a-f]+(:+[0-9a-f]+)*))\s+dev\s+([a-z0-9-]+)\s+(lladdr ([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})\s+)?([a-z]+)\s*$', line, re.IGNORECASE)
-  return {"ipv4": m.group(2), "ipv6": m.group(3), "iface": m.group(5), "mac_address": m.group(7).upper() if m.group(7) else None, "state": m.group(8)} if m else None
+  m = re.search('^\s*(([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})|([0-9a-f]+(:+[0-9a-f]+)*))\s+dev\s+([a-z0-9-]+)\s+'+
+                '(lladdr ([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})\s+)?' +
+                '(ref ([0-9]+)\s+)?' +
+                '(used ([0-9]+)/([0-9]+)/([0-9]+)\s+)?' +
+                '(probes ([0-9]+)\s+)?' +
+                '([a-z]+)\s*$', line, re.IGNORECASE)
+  return {"ipv4": m.group(2), "ipv6": m.group(3), "iface": m.group(5), "mac_address": m.group(7).upper() if m.group(7) else None, "ref": m.group(9), "used": [m.group(11),m.group(12),m.group(13)], "probes": m.group(15), "state": m.group(16)} if m else None
 
 
 
