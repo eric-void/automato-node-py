@@ -34,6 +34,8 @@ definition = {
     'health-check_interval-multiplier': 2,
     # Internal
     'health-checker-secs': 5,
+    # If an entry fails only for required entries, do not publish its status change
+    'health-do-not-publish-require-failures': True,
   },
   'publish': {
     'health/status': {
@@ -56,6 +58,12 @@ definition = {
     '*.failure',
   ]
 }
+  
+"""
+entry.definition.config = {
+  'health-publish' = 'always|never|major', # default: major
+}
+"""
 
 def load(entry):
   return {
@@ -72,13 +80,13 @@ SYSTEM_HANDLER_ORDER_entry_load = 10
 def entry_load(self_entry, entry):
   if entry.is_local:
     entry.health_entry = self_entry
-    entry.health_published_status = { 'value': '', 'reason': '' }
+    entry.health_status = { 'value': '', 'reason': '', 'flags': [] }
     entry.health_dead = '' # Reason the entry should be considered dead
     entry.health_response = '' # A failure in response to subscribed topic
     entry.health_required = {} # The status of required entries (only for entries in status "dead" or "failure")
     entry.health_publish = {} # Failure in run_interval/check_interval (not published as often as expected)
     entry.health_time = 0 # Last access to an health_* variable
-    entry.health_changed = 0 # Last change to an health_* variable
+    entry.health_changed = 0 # Last MAJOR change (from alive|idle to dead|failure or back) to an health_* variable
     entry.health_config_dead_disconnected_timeout = utils.read_duration(entry.config['health-dead-disconnected-timeout'] if 'health-dead-disconnected-timeout' in entry.config else (self_entry.config['health-dead-disconnected-timeout'] if 'health-dead-disconnected-timeout' in self_entry.config else 0))
     entry.health_config_alive_on_message = utils.read_duration(entry.config['health-alive-on-message'] if 'health-alive-on-message' in entry.config else (self_entry.config['health-alive-on-message'] if 'health-alive-on-message' in self_entry.config else False))
     entry.health_config_dead_message_timeout = utils.read_duration(entry.config['health-dead-message-timeout'] if 'health-dead-message-timeout' in entry.config else (self_entry.config['health-dead-message-timeout'] if 'health-dead-message-timeout' in self_entry.config else 0))
@@ -146,7 +154,16 @@ def entry_health_status(entry):
   if not entry.is_local or not hasattr(entry, 'health_entry'):
     return None
   
-  res = {'value': 'idle', 'reason': ''}
+  res = {'value': 'idle', 'reason': '', 'flags': []}
+  
+  if entry.health_dead:
+    res['flags'].append('dead')
+  if entry.health_response:
+    res['flags'].append('response')
+  if entry.health_required:
+    res['flags'].append('required')
+  if entry.health_publish:
+    res['flags'].append('publish')
   
   if entry.health_dead:
     res['value'] = 'dead'
@@ -168,18 +185,27 @@ def entry_health_status(entry):
 
   return res
 
-def check_health_status(entry):
+def check_health_status(installer_entry, entry):
   entry.health_time = system.time()
-  publish_health_status(entry)
+  publish_health_status(installer_entry, entry)
 
-def publish_health_status(entry, force = False):
+def publish_health_status(installer_entry, entry):
   status = entry_health_status(entry)
   if status:
-    changed = status['value'] != entry.health_published_status['value'] or status['reason'] != entry.health_published_status['reason']
-    if changed:
+    has_problems = status['value'] == 'dead' or status['value'] == 'failure'
+    had_problems = entry.health_status['value'] == 'dead' or entry.health_status['value'] == 'failure'
+    changed = status['value'] != entry.health_status['value'] or status['reason'] != entry.health_status['reason']
+    changed_major = has_problems != had_problems
+    
+    to_publish = entry.config['health-publish'] if 'health-publish' in entry.config else 'major'
+    if installer_entry.config['health-do-not-publish-require-failures'] and ((status['flags'] == ['required'] and entry.health_status == []) or (status['flags'] == ['required'] and entry.health_status == [])):
+      to_publish = False
+    if changed_major:
       entry.health_changed = entry.health_time
-    if force or changed:
-      entry.health_published_status = status
+    if changed:
+      entry.health_status = status
+    
+    if to_publish == 'always' or (to_publish == 'major' and changed_major):
       status['changed'] = entry.health_changed
       status['schanged'] = utils.strftime(status['changed']) if status['changed'] > 0 else '-'
       #status['entry'] = entry.id
@@ -231,7 +257,7 @@ def _health_checker_timer(entry):
           source_entry = system.entry_get(entry_id)
           if source_entry:
             source_entry.health_dead = entry.health_dead_checker[entry_id][2]
-            check_health_status(source_entry)
+            check_health_status(entry, source_entry)
         entry.health_dead_checker = { entry_id: entry.health_dead_checker[entry_id] for entry_id in entry.health_dead_checker if entry_id not in timeouts }
       
       # health_publish_checker
@@ -242,7 +268,7 @@ def _health_checker_timer(entry):
             target_entry = system.entry_get(e)
             if target_entry and t not in target_entry.health_publish:
               target_entry.health_publish[t] = [now, entry.health_publish_checker[t][e]['last_published'], entry.health_publish_checker[t][e]['interval'], delay]
-              check_health_status(target_entry)
+              check_health_status(entry, target_entry)
 
     system.sleep(entry.config['health-checker-secs'])
 
@@ -253,7 +279,7 @@ def event_connected(self_entry, source_entry, eventname, eventdata, caller, publ
     source_entry.health_response = ''
     if source_entry.id in self_entry.health_dead_checker:
       del self_entry.health_dead_checker[source_entry.id]
-    check_health_status(source_entry)
+    check_health_status(self_entry, source_entry)
   else:
     self_entry.health_dead_checker[source_entry.id] = (system.time() + source_entry.health_config_dead_disconnected_timeout, source_entry.health_config_dead_disconnected_timeout, 'disconnected for too long')
 
@@ -282,7 +308,7 @@ def on_subscribe_all_messages(entry, subscribed_message):
   # Look for entries subscribed to this topic. If a "response" is defined, we will wait for the response to come (or not)
   for sm in message.subscribedMessages():
     if 'response' in sm.definition:
-      system.subscribe_response(sm.entry, subscribed_message.message, callback = on_response_to_subscribed_message, no_response_callback = on_no_response_to_subscribed_message)
+      system.subscribe_response(sm.entry, subscribed_message.message, callback = lambda _entry, _id, _message, _final, _response_to_message: on_response_to_subscribed_message(entry, _entry, _id, _message, _final, _response_to_message), no_response_callback = lambda _entry, _id, _response_to_message: on_no_response_to_subscribed_message(entry, _entry, _id, _response_to_message))
   
   # Update publish checker
   for pm in subscribed_message.message.publishedMessages():
@@ -290,7 +316,7 @@ def on_subscribe_all_messages(entry, subscribed_message):
       entry.health_publish_checker[pm.topic_rule][pm.entry.id]['last_published'] = system.time()
       if pm.entry and pm.topic_rule in pm.entry.health_publish:
         del pm.entry.health_publish[pm.topic_rule]
-        check_health_status(pm.entry)
+        check_health_status(entry, pm.entry)
   """
   if subscribed_message.topic in entry.health_publish_checker:
     for e in entry.health_publish_checker[subscribed_message.topic]:
@@ -298,16 +324,16 @@ def on_subscribe_all_messages(entry, subscribed_message):
       target_entry = system.entry_get(e)
       if target_entry and subscribed_message.topic in target_entry.health_publish:
         del target_entry.health_publish[subscribed_message.topic]
-        check_health_status(target_entry)
+        check_health_status(entry, target_entry)
   """
 
-def on_response_to_subscribed_message(entry, id, message, final, response_to_message):
+def on_response_to_subscribed_message(installer_entry, entry, id, message, final, response_to_message):
   entry.health_response = ''
-  check_health_status(entry)
+  check_health_status(installer_entry, entry)
 
-def on_no_response_to_subscribed_message(entry, id, response_to_message):
+def on_no_response_to_subscribed_message(installer_entry, entry, id, response_to_message):
   entry.health_response = _('no response to {topic} = {payload} request').format(topic = response_to_message.topic, payload = str(response_to_message.payload)[0:20])
-  check_health_status(entry)
+  check_health_status(installer_entry, entry)
 
 def event_health_for_requirement(self_entry, source_entry, eventname, eventdata, caller, published_message, required_by_entry):
   m = system.current_received_message()
@@ -320,14 +346,14 @@ def event_health_for_requirement(self_entry, source_entry, eventname, eventdata,
   if eventname == 'alive':
     if not eventdata['params']['value']:
       required_by_entry.health_required[source_entry.id] = 'dead'
-      check_health_status(required_by_entry)
+      check_health_status(self_entry, required_by_entry)
     elif source_entry.id in required_by_entry.health_required and required_by_entry.health_required[source_entry.id] == 'dead':
       del required_by_entry.health_required[source_entry.id]
-      check_health_status(required_by_entry)
+      check_health_status(self_entry, required_by_entry)
   elif eventname == 'failure':
     if eventdata['params']['value']:
       required_by_entry.health_required[source_entry.id] = 'failure'
-      check_health_status(required_by_entry)
+      check_health_status(self_entry, required_by_entry)
     elif source_entry.id in required_by_entry.health_required and required_by_entry.health_required[source_entry.id] == 'failure':
       del required_by_entry.health_required[source_entry.id]
-      check_health_status(required_by_entry)
+      check_health_status(self_entry, required_by_entry)

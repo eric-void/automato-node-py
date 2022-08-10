@@ -53,6 +53,7 @@ def test_init():
         "item": "test-item2",
         "config": {
           "health-dead-message-timeout": "2s",
+          "health-publish": "always",
         },
         "publish": {
           "@/check": {
