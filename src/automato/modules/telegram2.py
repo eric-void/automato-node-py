@@ -16,15 +16,22 @@ from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler
 
 from automato.core import system
+from automato.core import utils
+from automato.core.notifications import notifications_levels
 
 definition = {
   'config': {
+    "notifications_client_id": "telegram",
     "token": "",
     "connect": True,
     "exclude_topic_prefixes_in_quick_commands": "home/", # regexp part, example: "home/|net/"
     "quick_commands": True,
     "quick_commands_regexp": "^(?:home/)?(?:get-)?(.*?)(?:/get)?$",
     "log": False,
+    "threshold_level": "warn",
+    "threshold_max": 6,
+    "threshold_duration": "6h",
+    "threshold_duration_max": "24h",
   }
 }
 
@@ -39,6 +46,13 @@ def init(entry):
       l = logging.getLogger('telegram')
       l.propagate = False
       l.addHandler(h)
+      
+    entry.threshold_queue_hidden = []
+    entry.threshold_queue_win = []
+    entry.threshold_level = notifications_levels[entry.config["threshold_level"]] if entry.config["threshold_level"] in notifications_levels else -1
+    entry.threshold_max = entry.config["threshold_max"]
+    entry.threshold_duration = utils.read_duration(entry.config["threshold_duration"])
+    entry.threshold_duration_max = utils.read_duration(entry.config["threshold_duration_max"])
     
     # http://python-telegram-bot.readthedocs.io/en/latest/telegram.ext.updater.html#telegram.ext.updater.Updater
     entry.updater = Updater(token = entry.config['token'], use_context = True)
@@ -81,18 +95,36 @@ def destroy(entry):
 # Chiamato al subscribe, può verificare i dati passati (in data, in formato stringa) e eventualmente sostituirli (in modo da salvare per le chiamate successive dei dati diversi)
 # @return i dati da salvare (in formato stringa)
 def notifications_subscribe(entry, driver, data, pattern):
-  if driver == "telegram":
+  if driver == entry.config["notifications_client_id"]:
     return data
 
 # Usato per l'unsubscribe, verifica che i dati passati dalla chiamata mqtt e i dati di un record su db siano equivalenti (e quindi nel caso può eliminare tale record)
 def notifications_matches(entry, driver, data_passed, data_saved, pattern):
-  if driver == "telegram":
+  if driver == entry.config["notifications_client_id"]:
     return data_passed == data_saved
 
 # Effettua l'invio di una notifica (definitiva da topic + message)
 def notifications_send(entry, driver, data, pattern, topic, message, notify_level):
-  if driver == "telegram":
+  if driver == entry.config["notifications_client_id"]:
     #logging.debug("{id}> sending telegram message ...".format(id = entry.id))
+    
+    if entry.threshold_level >= 0 and notify_level in notifications_levels and notifications_levels[level] <= entry.threshold_level:
+      entry.threshold_queue_win = [x for x in entry.threshold_queue_win if system.time() - x < entry.threshold_duration]
+      entry.threshold_queue_win.append(system.time())
+      if len(entry.threshold_queue_hidden) > 0 and (len(entry.threshold_queue_win) <= entry.threshold_max / 2 or system.time() - entry.threshold_queue_hidden[0][0] >= entry.threshold_duration_max):
+        fmessage = ""
+        for x in entry.threshold_queue_hidden:
+          fmessage += utils.strftime(x[0]) + "> " + x[3] + " " + _("({level} notification from {f})").format(f = x[2], level = x[1])) + "\n"
+        entry.updater.bot.send_message(chat_id = data, text = _("Collapsed messages:") + "\n" + fmessage)
+        entry.threshold_queue_hidden = []
+
+      if len(entry.threshold_queue_win) > entry.threshold_max:
+        if len(entry.threshold_queue_hidden) == 0:
+          entry.updater.bot.send_message(chat_id = data, text = _("Start collapsing messages..."))
+          
+        entry.threshold_queue_hidden.append([system.time(), notify_level, topic, message])
+        return
+    
     entry.updater.bot.send_message(chat_id = data, text = message + " " + _("({level} notification from {f})").format(f = topic, level = notify_level))
 
 def telegram_help_handler(entry, update, context):
@@ -116,7 +148,7 @@ def telegram_notify_sub_handler(entry, update, context):
   if not context.args:
     context.bot.send_message(chat_id = message.chat_id, text = _("Syntax error"), reply_to_message_id = message.message_id)
   else:
-    telegram_command_handler(entry, update, context, "notifications/subscribe/" + context.args[0], "telegram:" + str(message.chat_id), 'notifications/subscribe/#')
+    telegram_command_handler(entry, update, context, "notifications/subscribe/" + context.args[0], entry.config["notifications_client_id"] + ":" + str(message.chat_id), 'notifications/subscribe/#')
 
 def telegram_generic_message_handler(entry, update, context):
   message = update.message or update.edited_message
