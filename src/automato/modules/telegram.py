@@ -147,6 +147,7 @@ def threshold_queue_collapsed_send(entry, chat_id):
 
 def telegram_help_handler(entry, update, context):
   # https://core.telegram.org/bots/api#sendmessage
+  chat_id = update.message.chat_id
   _b = telegram_buffsend(entry, chat_id, "", "/notify_sub <LEVEL:(debug|info|warn|error|critical)[_]|_>/<TYPE|_>/<TOPIC|_>: " + _("subscribe to notifications described by pattern"))
   _b = telegram_buffsend(entry, chat_id, _b, "/show_setcommands - " + _("Show commands description, use this for botfather's /setcommands"))
   _b = telegram_buffsend(entry, chat_id, _b, "/collapsed - " + _("Show collapsed messages, if present, and clear collapsed messages queue"))
@@ -156,6 +157,7 @@ def telegram_help_handler(entry, update, context):
   telegram_buffsend(entry, chat_id, _b)
 
 def telegram_show_setcommands_handler(entry, update, context):
+  chat_id = update.message.chat_id
   _b = telegram_buffsend(entry, chat_id, "", "notify_sub - " + _("subscribe to notifications described by pattern") + " - " + _("Syntax") + ": <LEVEL:(debug|info|warn|error|critical)[_]|_>/<TYPE|_>/<TOPIC|_>")
   _b = telegram_buffsend(entry, chat_id, _b, "show_setcommands - " + _("Show commands description, use this for botfather's /setcommands"))
   _b = telegram_buffsend(entry, chat_id, _b, "collapsed - " + _("Show collapsed messages, if present, and clear collapsed messages queue"))
