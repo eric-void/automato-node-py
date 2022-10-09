@@ -97,7 +97,7 @@ def destroy(entry):
 
 def telegram_buffsend(mbuffer = None, message = None, init_bot = None, init_entry = None, init_chat_id = None):
   if init_chat_id:
-    mbuffer = { 'bot': init_bot if init_bot else init_entry.updater.bot, 'chat_id': chat_id, 'text': ""}
+    mbuffer = { 'bot': init_bot if init_bot else init_entry.updater.bot, 'chat_id': init_chat_id, 'text': ""}
     return mbuffer
 
   if message == None or len(mbuffer['text']) + len(message) + 2 >= 4096:
