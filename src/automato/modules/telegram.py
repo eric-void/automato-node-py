@@ -95,6 +95,14 @@ def destroy(entry):
   if entry.config["connect"]:
     entry.updater.stop()
 
+def telegram_buffsend(entry, chat_id, mbuffer, message = -1):
+  if message == -1 or len(mbuffer) + len(message) + 2 >= 4096:
+    entry.updater.bot.send_message(chat_id = chat_id, text = mbuffer)
+    mbuffer = ""
+  if message != -1:
+    mbuffer += message + "\n"
+  return mbuffer
+
 # Chiamato al subscribe, può verificare i dati passati (in data, in formato stringa) e eventualmente sostituirli (in modo da salvare per le chiamate successive dei dati diversi)
 # @return i dati da salvare (in formato stringa)
 def notifications_subscribe(entry, driver, data, pattern):
@@ -129,25 +137,31 @@ def notifications_send(entry, driver, data, pattern, topic, message, notify_leve
 
 def threshold_queue_collapsed_send(entry, chat_id):
   if len(entry.threshold_queue_collapsed):
-    entry.updater.bot.send_message(chat_id = chat_id, text = _("Collapsed messages:"))
+    _b = telegram_buffsend(entry, chat_id, "", _("Collapsed messages:"))
     for x in entry.threshold_queue_collapsed:
-      entry.updater.bot.send_message(chat_id = chat_id, text = utils.strftime(x[0]) + "> " + x[3] + " " + _("({level} notification from {f})").format(f = x[2], level = x[1]))
+      _b = telegram_buffsend(entry, chat_id, _b, utils.strftime(x[0]) + "> " + x[3] + " " + _("({level} notification from {f})").format(f = x[2], level = x[1]))
+    telegram_buffsend(entry, chat_id, _b)
     entry.threshold_queue_collapsed = []
+  else:
+    entry.updater.bot.send_message(chat_id = chat_id, text = _("No collapsed messages"))
 
 def telegram_help_handler(entry, update, context):
   # https://core.telegram.org/bots/api#sendmessage
-  context.bot.send_message(chat_id = update.message.chat_id, text = "/notify_sub <LEVEL:(debug|info|warn|error|critical)[_]|_>/<TYPE|_>/<TOPIC|_>: " + _("subscribe to notifications described by pattern"))
-  context.bot.send_message(chat_id = update.message.chat_id, text = "/show_setcommands - " + _("Show commands description, use this for botfather's /setcommands"))
-  context.bot.send_message(chat_id = update.message.chat_id, text = "/collapsed - " + _("Show collapsed messages, if present, and clear collapsed messages queue"))
+  _b = telegram_buffsend(entry, chat_id, "", "/notify_sub <LEVEL:(debug|info|warn|error|critical)[_]|_>/<TYPE|_>/<TOPIC|_>: " + _("subscribe to notifications described by pattern"))
+  _b = telegram_buffsend(entry, chat_id, _b, "/show_setcommands - " + _("Show commands description, use this for botfather's /setcommands"))
+  _b = telegram_buffsend(entry, chat_id, _b, "/collapsed - " + _("Show collapsed messages, if present, and clear collapsed messages queue"))
   for t in topics_help:
     context.bot.send_message(chat_id = update.message.chat_id, text = topics_help[t])
-  context.bot.send_message(chat_id = update.message.chat_id, text = "/TOPIC MESSAGE: " + _("send a generic TOPIC+MESSAGE to MQTT broker"))
+  _b = telegram_buffsend(entry, chat_id, _b, "/TOPIC MESSAGE: " + _("send a generic TOPIC+MESSAGE to MQTT broker"))
+  telegram_buffsend(entry, chat_id, _b)
 
 def telegram_show_setcommands_handler(entry, update, context):
-  context.bot.send_message(chat_id = update.message.chat_id, text = "notify_sub - " + _("subscribe to notifications described by pattern") + " - " + _("Syntax") + ": <LEVEL:(debug|info|warn|error|critical)[_]|_>/<TYPE|_>/<TOPIC|_>")
-  context.bot.send_message(chat_id = update.message.chat_id, text = "show_setcommands - " + _("Show commands description, use this for botfather's /setcommands"))
+  _b = telegram_buffsend(entry, chat_id, "", "notify_sub - " + _("subscribe to notifications described by pattern") + " - " + _("Syntax") + ": <LEVEL:(debug|info|warn|error|critical)[_]|_>/<TYPE|_>/<TOPIC|_>")
+  _b = telegram_buffsend(entry, chat_id, _b, "show_setcommands - " + _("Show commands description, use this for botfather's /setcommands"))
+  _b = telegram_buffsend(entry, chat_id, _b, "collapsed - " + _("Show collapsed messages, if present, and clear collapsed messages queue"))
   for t in commands:
-    context.bot.send_message(chat_id = update.message.chat_id, text = t + " - " + commands[t]['help'])
+    _b = telegram_buffsend(entry, chat_id, _b, t + " - " + commands[t]['help'])
+  telegram_buffsend(entry, chat_id, _b)
   
 def telegram_collapsed_handler(entry, update, context):
   threshold_queue_collapsed_send(entry, update.message.chat_id)
