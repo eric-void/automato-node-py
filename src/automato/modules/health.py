@@ -198,7 +198,7 @@ def publish_health_status(installer_entry, entry):
     changed_major = has_problems != had_problems
     
     to_publish = entry.config['health-publish'] if 'health-publish' in entry.config else 'major'
-    if installer_entry.config['health-do-not-publish-require-failures'] and ((status['flags'] == ['required'] and entry.health_status == []) or (status['flags'] == ['required'] and entry.health_status == [])):
+    if installer_entry.config['health-do-not-publish-require-failures'] and ((status['flags'] == ['required'] and entry.health_status['flags'] == []) or (status['flags'] == [] and entry.health_status['flags'] == ['required'])):
       to_publish = False
     if changed_major:
       entry.health_changed = entry.health_time
