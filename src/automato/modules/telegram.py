@@ -7,6 +7,7 @@
 import logging
 import json
 import re
+import threading
 from logging.handlers import TimedRotatingFileHandler
 
 import telegram
@@ -47,7 +48,8 @@ def init(entry):
       l.propagate = False
       l.addHandler(h)
       
-    entry.threshold_queue_hidden = []
+    entry.threshold_lock = threading.Lock()
+    entry.threshold_queue_collapsed = []
     entry.threshold_queue_win = []
     entry.threshold_level = notifications_levels[entry.config["threshold_level"]] if entry.config["threshold_level"] in notifications_levels else -1
     entry.threshold_max = entry.config["threshold_max"]
@@ -63,6 +65,7 @@ def init(entry):
     entry.dispatcher.add_handler(CommandHandler('help', lambda update, context: telegram_help_handler(entry, update, context)))
     entry.dispatcher.add_handler(CommandHandler('show_setcommands', lambda update, context: telegram_show_setcommands_handler(entry, update, context)))
     entry.dispatcher.add_handler(CommandHandler('notify_sub', lambda update, context: telegram_notify_sub_handler(entry, update, context), pass_args = True))
+    entry.dispatcher.add_handler(CommandHandler('collapsed', lambda update, context: telegram_collapsed_handler(entry, update, context)))
     entry.dispatcher.add_handler(MessageHandler(Filters.command, lambda update, context: telegram_generic_message_handler(entry, update, context)))
     entry.dispatcher.add_error_handler(lambda update, context: telegram_error_handler(entry, update, context))
     
@@ -109,28 +112,33 @@ def notifications_send(entry, driver, data, pattern, topic, message, notify_leve
     #logging.debug("{id}> sending telegram message ...".format(id = entry.id))
     
     if entry.threshold_level >= 0 and notify_level in notifications_levels and notifications_levels[level] <= entry.threshold_level:
-      entry.threshold_queue_win = [x for x in entry.threshold_queue_win if system.time() - x < entry.threshold_duration]
-      entry.threshold_queue_win.append(system.time())
-      if len(entry.threshold_queue_hidden) > 0 and (len(entry.threshold_queue_win) <= entry.threshold_max / 2 or system.time() - entry.threshold_queue_hidden[0][0] >= entry.threshold_duration_max):
-        fmessage = ""
-        for x in entry.threshold_queue_hidden:
-          fmessage += utils.strftime(x[0]) + "> " + x[3] + " " + _("({level} notification from {f})").format(f = x[2], level = x[1])) + "\n"
-        entry.updater.bot.send_message(chat_id = data, text = _("Collapsed messages:") + "\n" + fmessage)
-        entry.threshold_queue_hidden = []
+      with entry.threshold_lock:
+        entry.threshold_queue_win = [x for x in entry.threshold_queue_win if system.time() - x < entry.threshold_duration]
+        entry.threshold_queue_win.append(system.time())
+        if len(entry.threshold_queue_collapsed) > 0 and (len(entry.threshold_queue_win) <= entry.threshold_max / 2 or system.time() - entry.threshold_queue_collapsed[0][0] >= entry.threshold_duration_max):
+          threshold_queue_collapsed_send(entry, data)
 
-      if len(entry.threshold_queue_win) > entry.threshold_max:
-        if len(entry.threshold_queue_hidden) == 0:
-          entry.updater.bot.send_message(chat_id = data, text = _("Start collapsing messages..."))
-          
-        entry.threshold_queue_hidden.append([system.time(), notify_level, topic, message])
-        return
+        if len(entry.threshold_queue_win) > entry.threshold_max:
+          if len(entry.threshold_queue_collapsed) == 0:
+            entry.updater.bot.send_message(chat_id = data, text = _("Start collapsing messages..."))
+            
+          entry.threshold_queue_collapsed.append([system.time(), notify_level, topic, message])
+          return
     
     entry.updater.bot.send_message(chat_id = data, text = message + " " + _("({level} notification from {f})").format(f = topic, level = notify_level))
+
+def threshold_queue_collapsed_send(entry, chat_id):
+  fmessage = ""
+  for x in entry.threshold_queue_collapsed:
+    fmessage += utils.strftime(x[0]) + "> " + x[3] + " " + _("({level} notification from {f})").format(f = x[2], level = x[1])) + "\n"
+  entry.updater.bot.send_message(chat_id = chat_id, text = _("Collapsed messages:") + "\n" + fmessage)
+  entry.threshold_queue_collapsed = []
 
 def telegram_help_handler(entry, update, context):
   # https://core.telegram.org/bots/api#sendmessage
   message = "/notify_sub <LEVEL:(debug|info|warn|error|critical)[_]|_>/<TYPE|_>/<TOPIC|_>: " + _("subscribe to notifications described by pattern") + "\n"
   message += "/show_setcommands - " + _("Show commands description, use this for botfather's /setcommands") + "\n"
+  message += "/collapsed - " + _("Show collapsed messages, if present, and clear collapsed messages queue") + "\n"
   for t in topics_help:
     message += topics_help[t] + "\n"
   message += "/TOPIC MESSAGE: " + _("send a generic TOPIC+MESSAGE to MQTT broker") + "\n"
@@ -142,6 +150,9 @@ def telegram_show_setcommands_handler(entry, update, context):
   for t in commands:
     message += t + " - " + commands[t]['help'] + "\n"
   context.bot.send_message(chat_id = update.message.chat_id, text = message)
+  
+def telegram_collapsed_handler(entry, update, context):
+  threshold_queue_collapsed_send(entry, update.message.chat_id)
 
 def telegram_notify_sub_handler(entry, update, context):
   message = update.message or update.edited_message
