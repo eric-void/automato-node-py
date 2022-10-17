@@ -31,9 +31,10 @@ definition = {
     "log": False,
     "threshold_level": "warn",
     "threshold_max": 6,
-    "threshold_duration": "6h",
-    "threshold_duration_max": "24h",
-  }
+    "threshold_duration": "4h",
+    "threshold_duration_max": "12h",
+  },
+  'run_interval': 600,
 }
 
 commands = {}
@@ -48,13 +49,16 @@ def init(entry):
       l.propagate = False
       l.addHandler(h)
       
-    entry.threshold_lock = threading.Lock()
-    entry.threshold_queue_collapsed = []
-    entry.threshold_queue_win = []
+    # threshold_config
     entry.threshold_level = notifications_levels[entry.config["threshold_level"]] if entry.config["threshold_level"] in notifications_levels else -1
     entry.threshold_max = entry.config["threshold_max"]
     entry.threshold_duration = utils.read_duration(entry.config["threshold_duration"])
     entry.threshold_duration_max = utils.read_duration(entry.config["threshold_duration_max"])
+    # threshold state (by chat_id)
+    entry.threshold_lock = {}
+    entry.threshold_collapsed = {}
+    entry.threshold_queue_collapsed = {}
+    entry.threshold_queue_win = {}
     
     # http://python-telegram-bot.readthedocs.io/en/latest/telegram.ext.updater.html#telegram.ext.updater.Updater
     entry.updater = Updater(token = entry.config['token'], use_context = True)
@@ -95,6 +99,12 @@ def destroy(entry):
   if entry.config["connect"]:
     entry.updater.stop()
 
+def run(entry):
+  for chat_id in entry.threshold_lock:
+    with entry.threshold_lock[chat_id]:
+      if len(entry.threshold_queue_collapsed[chat_id]) > 0 and system.time() - entry.threshold_queue_collapsed[chat_id][0][0] >= entry.threshold_duration_max:
+        threshold_queue_collapsed_send(entry, chat_id)
+
 def telegram_buffsend(mbuffer = None, message = None, init_bot = None, init_entry = None, init_chat_id = None):
   if init_chat_id:
     mbuffer = { 'bot': init_bot if init_bot else init_entry.updater.bot, 'chat_id': init_chat_id, 'text': ""}
@@ -119,34 +129,64 @@ def notifications_matches(entry, driver, data_passed, data_saved, pattern):
     return data_passed == data_saved
 
 # Effettua l'invio di una notifica (definitiva da topic + message)
-def notifications_send(entry, driver, data, pattern, topic, message, notify_level):
+def notifications_send(entry, driver, chat_id, pattern, topic, message, notify_level):
   if driver == entry.config["notifications_client_id"]:
     #logging.debug("{id}> sending telegram message ...".format(id = entry.id))
     
-    if entry.threshold_level >= 0 and notify_level in notifications_levels and notifications_levels[level] <= entry.threshold_level:
-      with entry.threshold_lock:
-        entry.threshold_queue_win = [x for x in entry.threshold_queue_win if system.time() - x < entry.threshold_duration]
-        entry.threshold_queue_win.append(system.time())
-        if len(entry.threshold_queue_collapsed) > 0 and (len(entry.threshold_queue_win) <= entry.threshold_max / 2 or system.time() - entry.threshold_queue_collapsed[0][0] >= entry.threshold_duration_max):
-          threshold_queue_collapsed_send(entry, data)
+    if entry.threshold_level >= 0 and notify_level in notifications_levels and notifications_levels[notify_level] <= entry.threshold_level:
+      if not chat_id in entry.threshold_lock:
+        entry.threshold_lock[chat_id] = threading.Lock()
+        entry.threshold_collapsed[chat_id] = False
+        entry.threshold_queue_collapsed[chat_id] = []
+        entry.threshold_queue_win[chat_id] = []
+      
+      with entry.threshold_lock[chat_id]:
+        entry.threshold_queue_win[chat_id] = [x for x in entry.threshold_queue_win[chat_id] if system.time() - x < entry.threshold_duration]
+        entry.threshold_queue_win[chat_id].append(system.time())
+        if entry.threshold_collapsed[chat_id] and len(entry.threshold_queue_win[chat_id]) <= entry.threshold_max / 2:
+          threshold_queue_collapsed_send(entry, chat_id)
+          entry.threshold_collapsed[chat_id] = False
+          entry.updater.bot.send_message(chat_id = chat_id, text = _("Stopped collapsing messages."))
 
-        if len(entry.threshold_queue_win) > entry.threshold_max:
-          if len(entry.threshold_queue_collapsed) == 0:
-            entry.updater.bot.send_message(chat_id = data, text = _("Start collapsing messages..."))
-            
-          entry.threshold_queue_collapsed.append([system.time(), notify_level, topic, message])
+        elif not entry.threshold_collapsed[chat_id] and len(entry.threshold_queue_win[chat_id]) > entry.threshold_max:
+          entry.threshold_collapsed[chat_id] = True
+          entry.updater.bot.send_message(chat_id = chat_id, text = _("Started collapsing messages..."))
+          
+        if entry.threshold_collapsed[chat_id]:
+          entry.threshold_queue_collapsed[chat_id].append([system.time(), notify_level, topic, message])
           return
     
-    entry.updater.bot.send_message(chat_id = data, text = message + " " + _("({level} notification from {f})").format(f = topic, level = notify_level))
+    entry.updater.bot.send_message(chat_id = chat_id, text = message + " " + _("({level} notification from {f})").format(f = topic, level = notify_level))
 
-def threshold_queue_collapsed_send(entry, chat_id):
-  if len(entry.threshold_queue_collapsed):
+def threshold_queue_collapsed_send(entry, chat_id, summary = True, messages = True, reset = True):
+  if chat_id in entry.threshold_queue_collapsed and len(entry.threshold_queue_collapsed[chat_id]):
     _b = telegram_buffsend(init_entry = entry, init_chat_id = chat_id)
-    telegram_buffsend(_b, _("Collapsed messages:"))
-    for x in entry.threshold_queue_collapsed:
-      telegram_buffsend(_b, utils.strftime(x[0]) + "> " + x[3] + " " + _("({level} notification from {f})").format(f = x[2], level = x[1]))
+    if (summary)
+      by_level = {}
+      c = 0
+      for x in entry.threshold_queue_collapsed[chat_id]:
+        c += 1
+        if notifications_levels[x[1]] not in by_level:
+          by_level[notifications_levels[x[1]]] = { 't': x[1], 'c': 0, 'from': {}}
+        by_level[notifications_levels[x[1]]]['c'] += 1
+        if x[2] not in by_level[notifications_levels[x[1]]]['from']:
+          by_level[notifications_levels[x[1]]]['from'][x[2]] = 0
+        by_level[notifications_levels[x[1]]]['from'][x[2]] += 1
+          
+      telegram_buffsend(_b, _("Collapsed messages") + ': ' + str(c))
+      for l in sorted(by_level.keys(), reverse = True):
+        telegram_buffsend(_b, '- ' + by_level[l]['t'] + ': ' + str(by_level[l]['c']) + ' (' + ', '.join([(x + ': ' + str(by_level[l]['from'][x])) for x in by_level[l]['from']]) + ')')
+    else:
+      telegram_buffsend(_b, _("Collapsed messages") + ':')
+    
+    if (messages)
+      for x in entry.threshold_queue_collapsed[chat_id]:
+        telegram_buffsend(_b, utils.strftime(x[0]) + "> " + x[3] + " " + _("({level} notification from {f})").format(f = x[2], level = x[1]))
+
     telegram_buffsend(_b)
-    entry.threshold_queue_collapsed = []
+    
+    if (reset)
+      entry.threshold_queue_collapsed[chat_id] = []
   else:
     entry.updater.bot.send_message(chat_id = chat_id, text = _("No collapsed messages"))
 
