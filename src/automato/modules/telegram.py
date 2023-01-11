@@ -161,7 +161,7 @@ def notifications_send(entry, driver, chat_id, pattern, topic, message, notify_l
 def threshold_queue_collapsed_send(entry, chat_id, summary = True, messages = True, reset = True):
   if chat_id in entry.threshold_queue_collapsed and len(entry.threshold_queue_collapsed[chat_id]):
     _b = telegram_buffsend(init_entry = entry, init_chat_id = chat_id)
-    if (summary)
+    if summary:
       by_level = {}
       c = 0
       for x in entry.threshold_queue_collapsed[chat_id]:
@@ -176,16 +176,18 @@ def threshold_queue_collapsed_send(entry, chat_id, summary = True, messages = Tr
       telegram_buffsend(_b, _("Collapsed messages") + ': ' + str(c))
       for l in sorted(by_level.keys(), reverse = True):
         telegram_buffsend(_b, '- ' + by_level[l]['t'] + ': ' + str(by_level[l]['c']) + ' (' + ', '.join([(x + ': ' + str(by_level[l]['from'][x])) for x in by_level[l]['from']]) + ')')
+      if (messages)
+        telegram_buffsend(_b, '')
     else:
       telegram_buffsend(_b, _("Collapsed messages") + ':')
     
-    if (messages)
+    if messages:
       for x in entry.threshold_queue_collapsed[chat_id]:
         telegram_buffsend(_b, utils.strftime(x[0]) + "> " + x[3] + " " + _("({level} notification from {f})").format(f = x[2], level = x[1]))
 
     telegram_buffsend(_b)
     
-    if (reset)
+    if reset:
       entry.threshold_queue_collapsed[chat_id] = []
   else:
     entry.updater.bot.send_message(chat_id = chat_id, text = _("No collapsed messages"))
