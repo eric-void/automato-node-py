@@ -176,7 +176,7 @@ def threshold_queue_collapsed_send(entry, chat_id, summary = True, messages = Tr
       telegram_buffsend(_b, _("Collapsed messages") + ': ' + str(c))
       for l in sorted(by_level.keys(), reverse = True):
         telegram_buffsend(_b, '- ' + by_level[l]['t'] + ': ' + str(by_level[l]['c']) + ' (' + ', '.join([(x + ': ' + str(by_level[l]['from'][x])) for x in by_level[l]['from']]) + ')')
-      if (messages)
+      if messages:
         telegram_buffsend(_b, '')
     else:
       telegram_buffsend(_b, _("Collapsed messages") + ':')
