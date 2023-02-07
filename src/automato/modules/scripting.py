@@ -46,7 +46,7 @@ def scripting_globals(entry, _globals):
     'entry_invoke': node.entry_invoke, # (entry, method, *args, **kwargs)
     #'entries_invoke': node.entries_invoke, # (method, *args, **kwargs)
     'run_publish': entry.run_publish, # (topic_rule)
-    'do': system.do_action, # (actionref, params, if_event_not_match = False, if_event_not_match_keys = False, if_event_not_match_timeout = None)
+    'do': system.do_action_lambda(entry), # (actionref, params, if_event_not_match = False, if_event_not_match_keys = False, if_event_not_match_timeout = None)
     'entry_do': system.entry_do_action, # (entry_or_id, action, params = {}, init = None, if_event_not_match = False, if_event_not_match_keys = False, if_event_not_match_timeout = None)
     'self_do': entry.do, # (action, params = {}, init = None, if_event_not_match = False, if_event_not_match_keys = False, if_event_not_match_timeout = None)
     'event_get': system.event_get, # (eventref, timeout = None, keys = None, topic = None)
