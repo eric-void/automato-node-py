@@ -1,0 +1,2 @@
+# https://github.com/rshipp/python-nut2 (Embeds: https://github.com/networkupstools/nut/tree/master/scripts/python)
+nut2 >= 2.1.1
