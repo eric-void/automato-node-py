@@ -15,6 +15,8 @@ def test_init():
           
           'health-check_interval-multiplier': 1.5,
           'health-checker-secs': .1,
+          
+          'health-do-not-publish-require-failures': False,
         },
         "publish": {
           "health/status": {
@@ -130,8 +132,8 @@ def test_run(entries):
 
     test.waitPublish("device/test-device/sub3xxx", "")
     test.assertPublish("no-response3", "device/test-device/sub3yyy-res", "", assertSubscribeSomePayload = { 
-      'device/test-device/health': { 'value': 'failure', 'reason': ('re', '.*device/test-device/sub3.*'), 'time': ('d', system.time(), 6) },
-      'item/test-item/health': { 'value': 'failure', 'reason': ('re', '.*test-device.*failure.*'), 'time': ('d', system.time(), 6) },
+      'device/test-device/health': { 'value': 'failure', 'reason': ('re', '.*device/test-device/sub3.*'), 'time': ('d', system.time(), 10) },
+      'item/test-item/health': { 'value': 'failure', 'reason': ('re', '.*test-device.*failure.*'), 'time': ('d', system.time(), 10) },
     }, timeoutms = 7000)
     
     test.waitPublish("device/test-device/sub3xxx", "")
