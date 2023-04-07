@@ -191,7 +191,7 @@ def nut_connect(entry, config = None):
     config = entry.config
   nut_client = None
   try:
-    nut_client = PyNUTClient(host = config['nut_host'], port = config['nut_port'], login = config['nut_username'], password = config['nut_password'], debug = config['nut_debug'])
+    nut_client = PyNUT.PyNUTClient(host = config['nut_host'], port = config['nut_port'], login = config['nut_username'], password = config['nut_password'], debug = config['nut_debug'])
     if not nut_client.CheckUPSAvailable(config['nut_upsname']):
       logging.error("#{id}> UPS {upsname} is not available".format(id = entry.id, upsname = config['nut_upsname']))
       nut_client = None
@@ -207,7 +207,7 @@ def nut_GetUPSVars(entry, config = None, nut_client = None):
     res = config['nut_test_result']['GetUPSVars']
   else:
     if not nut_client:
-      nut_client = nut_connect(entry)
+      nut_client = nut_connect(entry, config)
     if nut_client:
       try:
         res = nut_client.GetUPSVars(config['nut_upsname'])
