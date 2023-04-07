@@ -180,6 +180,7 @@ def run(entry):
       for k in nut_vars:
         if publish_all or k not in entry.nut_vars or nut_vars[k] != entry.nut_vars[k]:
           entry.publish('./var/' + k.replace('.', '_'), nut_vars[k])
+          entry.nut_vars[k] = nut_vars[k]
       if publish_all:
         entry.nut_vars_last_full = system.time()
 
