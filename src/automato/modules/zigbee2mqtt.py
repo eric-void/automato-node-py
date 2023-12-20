@@ -18,7 +18,9 @@ https://www.zigbee2mqtt.io/information/mqtt_topics_and_message_structure.html
 2019-09-11 20:52:05 - received message zigbee2mqtt/0x00158d00035cf702 = b'{"linkquality":0,"click":"long_release","duration":279}'
 2019-09-17 00:59:20 - received message zigbee2mqtt/0x00158d00035cf702 = b'{"linkquality":134,"battery":100,"voltage":3202,"click":"single"}'
 
-Pulsante ikea: click: on|off | brightness_up|brightness_down (quando si tiene premuto) | brightness_stop (quando viene rilasciato)
+ikea button: click: on|off | brightness_up|brightness_down (when pressed) | brightness_stop (when released) <-- LEGACY MODE
+  When legacy mode is off, you should check the "action" payload: brightness_move_up|brightness_move_down (when pressed) | brightness_stop (when released)
+  
 
 received message zigbee2mqtt/xiaomi_aqara_water_1 = b'{"battery":100,"voltage":3055,"linkquality":94,"last_seen":1588074240833,"water_leak":false,"elapsed":3006136}'
 """
@@ -32,6 +34,7 @@ device_types = {
   'zigbee_button': { },
   'zigbee_plug': { },
   'zigbee_vibration': { },
+  'zigbee_motion': { },
 }
 
 definition = {
@@ -55,9 +58,11 @@ def entry_install(installer_entry, entry, conf):
         'notify': _('Data received by zigbee device {caption} is: {{payload}}').format(caption = entry.definition['caption']),
         #'notify_level': 'debug',
         'events': {
-          # channel: single | double | triple | quadruple | many | long | long_release [+ x_duration in ms]
-          'input': 'js:((typeof payload == "object") && "click" in payload ? { value: 1, temporary: true, channel: payload["click"], "x_duration": "duration" in payload ? payload["duration"] : -1} : ' +
-            '((typeof payload == "object") && "water_leak" in payload ? { value: payload["water_leak"] ? 1 : 0, channel: "water-leak" } : null))',
+          # channel: single | double | triple | quadruple | many | long | long_release [+ x_duration in ms] - For ikea button brightness_up | brightness_down | brightness_stop
+          #
+          'input': 'js:((typeof payload == "object") && "action" in payload ? { value: 1, temporary: true, channel: payload["action"], "x_duration": "duration" in payload ? payload["duration"] : -1} : ' +
+            '((typeof payload == "object") && "click" in payload ? { value: 1, temporary: true, channel: payload["click"], "x_duration": "duration" in payload ? payload["duration"] : -1} : ' +
+            '((typeof payload == "object") && "water_leak" in payload ? { value: payload["water_leak"] ? 1 : 0, channel: "water-leak" } : null)))',
           'input:init': { 'value:def': [0, 1], 'channel:def': ['single', 'double', 'triple', 'quadruple', 'many', 'long', 'water-leak' ], 'duration:def': 'int' },
           'temperature': 'js:((typeof payload == "object") && "temperature" in payload ? { value: payload["temperature"] } : null)',
           'temperature:init': { 'value:unit': '°C' },
@@ -66,6 +71,7 @@ def entry_install(installer_entry, entry, conf):
           'output': 'js:((typeof payload == "object") && "state" in payload && (payload["state"] == "ON" || payload["state"] == "OFF") ? { value: payload["state"] == "ON" ? 1 : 0 } : null)',
           'water-leak': 'js:((typeof payload == "object") && "water_leak" in payload ? { value: payload["water_leak"] ? 1 : 0 } : null)',
           'vibration': 'js:((typeof payload == "object") && "vibration" in payload ? (payload["vibration"] ? { value: payload["vibration"] ? 1 : 0, temporary: true } : { value: payload["vibration"] ? 1 : 0}) : null)',
+          'occupancy': 'js:((typeof payload == "object") && "occupancy" in payload ? { value: payload["occupancy"] ? 1 : 0, temporary: true } : null)',
           'tamper': 'js:((typeof payload == "object") && "tamper" in payload ? { value: payload["tamper"] ? 1 : 0 } : null)',
         },
         'check_interval': '6h', # In genere tutti i device che ho ora mandano almeno 1 notifica all'ora (circa, anche extender e pulsanti), però mi tengo largo e considero 6h [NOTA: In realtà il pulsante ikea manda 1 notifica ogni 24h]
