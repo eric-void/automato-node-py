@@ -30,6 +30,7 @@ from automato.core import system
 default_def = { 'output_port:def': ['0'], 'input_port:def': ['0'], 'relay:def': [0, 1], 'input:def': [0, 1] }
 device_types = {
   'zigbee': { },
+  'zigbee_switch': { },
   'zigbee_temperature': { },
   'zigbee_button': { },
   'zigbee_plug': { },
@@ -82,9 +83,18 @@ def entry_install(installer_entry, entry, conf):
         'topic': 'zigbee2mqtt/' + str(conf["zigbee_id"]) + '/set',
         'response': [ 'zigbee2mqtt/' + str(conf["zigbee_id"]) ],
         'actions': {
-          'output-set': "js:params['value'] ? 'ON' : 'OFF'",
+          #'output-set': "js:params['value'] ? 'ON' : 'OFF'",
+          'output-set': "js:({'state': params['value'] ? 'ON': 'OFF'})",
           'output-set:init': { 'value:def': [0, 1] },
         }
-      }
+      },
+      'state-get': {
+        'topic': 'zigbee2mqtt/' + str(conf["zigbee_id"]) + '/get',
+        'response': [ 'zigbee2mqtt/' + str(conf["zigbee_id"]) ],
+        'actions': {
+          'output-get': "js:({'state': ''})",
+          'output-get:init': { 'value:def': [0, 1] },
+        }
+      },
     }
   })
