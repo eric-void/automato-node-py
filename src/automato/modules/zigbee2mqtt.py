@@ -59,12 +59,13 @@ def entry_install(installer_entry, entry, conf):
         'notify': _('Data received by zigbee device {caption} is: {{payload}}').format(caption = entry.definition['caption']),
         #'notify_level': 'debug',
         'events': {
-          # channel: single | double | triple | quadruple | many | long | long_release [+ x_duration in ms] - For ikea button brightness_up | brightness_down | brightness_stop
+          # channel: single | double | triple | quadruple | many | long | long_release | hold | hold_release [+ x_duration in ms] - For ikea button brightness_up | brightness_down | brightness_stop
+          #   (channel is the 'action' payload, if available. If not it uses the 'click' payload)
           #
           'input': 'js:((typeof payload == "object") && "action" in payload ? { value: 1, temporary: true, channel: payload["action"], "x_duration": "duration" in payload ? payload["duration"] : -1} : ' +
             '((typeof payload == "object") && "click" in payload ? { value: 1, temporary: true, channel: payload["click"], "x_duration": "duration" in payload ? payload["duration"] : -1} : ' +
             '((typeof payload == "object") && "water_leak" in payload ? { value: payload["water_leak"] ? 1 : 0, channel: "water-leak" } : null)))',
-          'input:init': { 'value:def': [0, 1], 'channel:def': ['single', 'double', 'triple', 'quadruple', 'many', 'long', 'water-leak' ], 'duration:def': 'int' },
+          'input:init': { 'value:def': [0, 1], 'channel:def': ['single', 'double', 'triple', 'quadruple', 'many', 'long', 'water-leak', 'hold', 'release' ], 'duration:def': 'int' },
           'temperature': 'js:((typeof payload == "object") && "temperature" in payload ? { value: payload["temperature"] } : null)',
           'temperature:init': { 'value:unit': '°C' },
           'humidity': 'js:((typeof payload == "object") && "humidity" in payload ? { value: payload["humidity"] } : null)',
