@@ -15,10 +15,10 @@ definition = {
   }
 }
 
-def ping(entry, ip):
+def ping(entry, ip, p_timeout = None):
   try:
-    h = icmplib.ping(ip, count = 1, timeout = entry.config['ping_timeout'], privileged = entry.config['ping_privileged'])
-    logging.debug("#{id}> pinged {ip}, is_alive: {is_alive}".format(id = entry.id, ip = ip, is_alive = h.is_alive))
+    h = icmplib.ping(ip, count = 1, timeout = p_timeout if p_timeout is not None else entry.config['ping_timeout'], privileged = entry.config['ping_privileged'])
+    logging.debug("#{id}> pinged {ip}, is_alive: {is_alive} (timeout: {timeout})".format(id = entry.id, ip = ip, is_alive = h.is_alive, timeout = p_timeout if p_timeout is not None else entry.config['ping_timeout']))
     return h.is_alive
   except:
     logging.exception("#{id}> failed executing ping {ip}".format(id = entry.id, ip = ip))
