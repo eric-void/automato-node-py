@@ -215,7 +215,7 @@ def nut_GetUPSVars(entry, config = None, nut_client = None):
       except :
         logging.exception("#{id}> error getting data (GetUPSVars) from UPS: {err}".format(id = entry.id, err = sys.exc_info()[1]))
   if res:
-    res = {k.decode("UTF-8"): float(res[k].decode("UTF-8")) if re.match("^[+-]?[0-9]+\.[0-9]+$", res[k].decode("UTF-8")) else int(res[k].decode("UTF-8")) if re.match("^[+-]?[0-9]+$", res[k].decode("UTF-8")) else res[k].decode("UTF-8") for k in res}
+    res = {k.decode("UTF-8"): float(res[k].decode("UTF-8")) if re.match(r'^[+-]?[0-9]+\.[0-9]+$', res[k].decode("UTF-8")) else int(res[k].decode("UTF-8")) if re.match(r'^[+-]?[0-9]+$', res[k].decode("UTF-8")) else res[k].decode("UTF-8") for k in res}
   return res
 
 # vv = nut_client.GetRWVars(entry.config['nut_upsname'])
