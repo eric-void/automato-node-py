@@ -10,7 +10,7 @@ from automato.core import utils
 """
 Detected presence of a person using two method
 - connection of a person device, via events "connected": temporary events are ignored, and the device MUST send connected(value=1) when connected and connected(value=0) after disconnected. When disconnected, the presence is mantained for "presence_connection_after_disconnect" time
-- location of a persona, via "location" events: a location event must be sent at least every "presence_location_session_duration" interval, or the presence is considered gone
+- location of a person, via "location" events: a location event must be sent at least every "presence_location_session_duration" interval, or the presence is considered gone
 """
 
 definition = {
