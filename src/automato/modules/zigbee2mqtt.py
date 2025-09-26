@@ -36,6 +36,10 @@ device_types = {
   'zigbee_plug': { },
   'zigbee_vibration': { },
   'zigbee_motion': { },
+  'zigbee_presence': { }, # "occupancy": true, "illuminance": 95,
+  'zigbee_waterleak': { },
+  'zigbee_contact': { }, # "contact": true,
+  'zigbee_waterlevel': { }, # "liquid_level_percent", "liquid_depth", "liquid_state" (@see https://www.zigbee2mqtt.io/devices/ME201WZ.html)
 }
 
 definition = {
@@ -62,9 +66,15 @@ def entry_install(installer_entry, entry, conf):
           # channel: single | double | triple | quadruple | many | long | long_release | hold | hold_release [+ x_duration in ms] - For ikea button brightness_up | brightness_down | brightness_stop
           #   (channel is the 'action' payload, if available. If not it uses the 'click' payload)
           #
-          'input': 'js:((typeof payload == "object") && "action" in payload ? { value: 1, temporary: true, channel: payload["action"], "x_duration": "duration" in payload ? payload["duration"] : -1} : ' +
-            '((typeof payload == "object") && "click" in payload ? { value: 1, temporary: true, channel: payload["click"], "x_duration": "duration" in payload ? payload["duration"] : -1} : ' +
-            '((typeof payload == "object") && "water_leak" in payload ? { value: payload["water_leak"] ? 1 : 0, channel: "water-leak" } : null)))',
+          'input': [
+            'js:( (typeof payload == "object") && "action" in payload ? { value: 1, temporary: true, channel: payload["action"], "x_duration": "duration" in payload ? payload["duration"] : -1} : ' +
+              '( (typeof payload == "object") && "click" in payload ? { value: 1, temporary: true, channel: payload["click"], "x_duration": "duration" in payload ? payload["duration"] : -1} : ' +
+              '( (typeof payload == "object") && "water_leak" in payload ? { value: payload["water_leak"] ? 1 : 0, channel: "water-leak" } : ' +
+              '( (typeof payload == "occupancy") && "occupancy" in payload ? { value: payload["occupancy"] ? 1 : 0, channel: "occupancy" } : ' +
+              '( (typeof payload == "contact") && "contact" in payload ? { value: payload["contact"] ? 1 : 0, channel: "contact" } : ' +
+              'null)))))',
+            'js:( (typeof payload == "contact") && "contact" in payload ? { value: payload["contact"] ? 0 : 1, channel: "contact-open" } : null)',
+          ],
           'input:init': { 'value:def': [0, 1], 'channel:def': ['single', 'double', 'triple', 'quadruple', 'many', 'long', 'water-leak', 'hold', 'release' ], 'duration:def': 'int' },
           'temperature': 'js:((typeof payload == "object") && "temperature" in payload ? { value: payload["temperature"] } : null)',
           'temperature:init': { 'value:unit': '°C' },
@@ -73,10 +83,23 @@ def entry_install(installer_entry, entry, conf):
           'output': 'js:((typeof payload == "object") && "state" in payload && (payload["state"] == "ON" || payload["state"] == "OFF") ? { value: payload["state"] == "ON" ? 1 : 0 } : null)',
           'water-leak': 'js:((typeof payload == "object") && "water_leak" in payload ? { value: payload["water_leak"] ? 1 : 0 } : null)',
           'vibration': 'js:((typeof payload == "object") && "vibration" in payload ? (payload["vibration"] ? { value: payload["vibration"] ? 1 : 0, temporary: true } : { value: payload["vibration"] ? 1 : 0}) : null)',
+          # TODO 'tilt' (x,y,z) {"battery":100,"elapsed":561,"last_seen":1750067147496,"linkquality":32,"sensitivity":"middle","tilt":false,"vibration":true,"x":251,"y":249,"z":199}
           'occupancy': 'js:((typeof payload == "object") && "occupancy" in payload ? { value: payload["occupancy"] ? 1 : 0, temporary: true } : null)',
           'tamper': 'js:((typeof payload == "object") && "tamper" in payload ? { value: payload["tamper"] ? 1 : 0 } : null)',
+          'illuminance': 'js:((typeof payload == "object") && "illuminance" in payload ? { value: payload["illuminance"] } : null)',
+          'contact': 'js:((typeof payload == "object") && "contact" in payload ? { value: payload["contact"] ? 1 : 0 } : null)',
+          'liquid_level_percent': 'js:((typeof payload == "object") && "liquid_level_percent" in payload ? { value: payload["liquid_level_percent"] } : null)',
+          'liquid_level_percent:init': { 'value:unit': '%' },
+          'liquid_depth': 'js:((typeof payload == "object") && "liquid_depth" in payload ? { value: payload["liquid_depth"] } : null)',
+          'liquid_depth:init': { 'value:unit': 'm' },
+          'liquid_distance': 'js:((typeof payload == "object") && "liquid_depth" in payload && "installation_height" in payload ? { value:payload["installation_height"] - payload["liquid_depth"] } : null)',
+          'liquid_distance:init': { 'value:unit': 'm' },
+          'liquid_state': 'js:((typeof payload == "object") && "liquid_state" in payload ? { value: payload["liquid_state"] } : null)',
+          'liquid_state:init': { 'value:def': ['low', 'normal', 'high'] },
+          'installation_height': 'js:((typeof payload == "object") && "installation_height" in payload ? { value: payload["installation_height"] } : null)',
+          'installation_height:init': { 'value:unit': 'm' },
         },
-        'check_interval': '6h', # In genere tutti i device che ho ora mandano almeno 1 notifica all'ora (circa, anche extender e pulsanti), però mi tengo largo e considero 6h [NOTA: In realtà il pulsante ikea manda 1 notifica ogni 24h]
+        'check_interval': '6h', # In genere tutti i device che ho mandano almeno 1 notifica all'ora (circa, anche extender e pulsanti), però mi tengo largo e considero 6h [NOTA: In realtà il pulsante ikea manda 1 notifica ogni 24h]
       }
     },
     'subscribe': {
