@@ -283,7 +283,7 @@ definition = {
     },
     
     # [L.0] topic_rule: Le dichiarazioni di topic regexp e mqtt, [L.1] l'uso di . e @, [L.2] gli handler
-    '/^.*$/': { 'handler': run_regexp }, # Usando '/' iniziale e finale si fa una regexp
+    '/^.*$/': { 'handler': run_regexp }, # Usando '/' iniziale e finale si fa una regexp (posso usare i / in mezzo senza escape)
     'time/#': { 'handler': run_match }, # Si possono usare anche i match "mqtt-style" (@see mqtt.topic_matches_sub)
      # Rule completa di match: a/b | a/# | /^(.*)$/ | a/b[payload1|payload2] | a/#[/^(payload.*)$/] | /^(.*)$/[js: payload['a']==1 && matches[1] == 'x']
 
