@@ -49,6 +49,7 @@ definition = {
 """
 entry.definition = {
   'net_sniffer_ping': True, # Force ping when there is no confidence over current connection
+  'net_sniffer_ping_timeout': 2, # Timeout for net_ping module call (if not specified, it uses timeout defined in net_ping.config["ping_timeout"])
   'net_sniffer_ignore_handler_confidence': True, # If true, do not trust confidence given by handler
   'net_sniffer_confidence_timeout': '15m', # Override confidence timeout for this entry
 }
@@ -187,7 +188,7 @@ def mac_address_detected(installer_entry, env, mac_address, connected = True, co
           confidence_timeout = utils.read_duration(entry.definition['net_sniffer_confidence_timeout']) if 'net_sniffer_confidence_timeout' in entry.definition else utils.read_duration(installer_entry.config['confidence_timeout'])
           if system.time() - installer_entry.net_sniffer_mac_addresses[mac_address]['last_seen_confidence'] > confidence_timeout:
             logging.debug("#{id}> {entry}: no confidence on {mac_address} connection, try pinging it ...".format(id = installer_entry.id, entry = entry.id, mac_address = mac_address))
-            connected = _ping(installer_entry, ip_address)
+            connected = _ping(installer_entry, ip_address, entry.definition['net_sniffer_ping_timeout'] if 'net_sniffer_ping_timeout' in entry.definition else None)
             confidence = True
         else:
           # If config requires ping for this entry, and ip_address is not available, ignore the detection
@@ -402,7 +403,7 @@ def __ip_neigh_process_line(line):
   # IPV4|IPV6 "dev" INTERFACE ["lladdr" MAC_ADDRESS_LOWECASE] [ref X] [used X/X/X] [probes X] "STALE|DELAY|REACHABLE|FAILED"
   # Ex: 192.168.2.234 dev wlan1-1 lladdr a8:03:2a:bc:71:58 STALE|DELAY|REACHABLE
   # Ex: fe80::32b5:c2ff:fe4f:d116 dev br-lan  FAILED
-  m = re.search('^\s*(([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})|([0-9a-f]+(:+[0-9a-f]+)*))\s+dev\s+([a-z0-9-]+)\s+'+
+  m = re.search('^\s*(([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})|([0-9a-f]+(:+[0-9a-f]+)*))\s+dev\s+([a-z0-9.-]+)\s+'+
                 '(lladdr ([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})\s+)?' +
                 '(ref ([0-9]+)\s+)?' +
                 '(used ([0-9]+)/([0-9]+)/([0-9]+)\s+)?' +
@@ -418,14 +419,14 @@ def __ip_neigh_process_line(line):
 # PING
 ###############################################################################
 
-def _ping(installer_entry, ip):
+def _ping(installer_entry, ip, timeout):
   # WARN Used also in net.module (@see entry.config['wan-connected-check-method'] == 'ping'), should be unified
   if installer_entry.config['use_ping_command']:
     response = subprocess.run(installer_entry.config['ping_command'].split(' ') + [ip], capture_output = True)
     logging.debug("#{id}> pinged {ip}: {response}".format(id = installer_entry.id, ip = ip, response = response))
     return response.returncode == 0
   if installer_entry.config['use_ping_module']:
-    return node.entries_invoke('ping', ip)
+    return node.entries_invoke('ping', ip, timeout)
 
 
 
