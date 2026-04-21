@@ -33,9 +33,11 @@ device_types = {
   'shellyem3': { 'emeter_port:def': ['0', '1', '2'], 'input:def': None },
   #TODO shellies/shellydimmer2-E09806966EFB/light/0/status	{"ison":true,"has_timer":false,"timer_started":0,"timer_duration":0,"timer_remaining":0,"mode":"white","brightness":41}
   
-  # Gen2 devices https://shelly-api-docs.shelly.cloud/gen2/
+  # Gen2/Gen3 devices https://shelly-api-docs.shelly.cloud/gen2/
   'shellyplus1': { 'gen': 2, 'components': { 'input:0': 'input', 'switch:0': 'switch' } },
   'shellypro2': { 'gen': 2, 'components': { 'input:0': 'input', 'input:1': 'input', 'switch:0': 'switch', 'switch:1': 'switch' } },
+  # https://shelly-api-docs.shelly.cloud/gen2/Devices/Gen3/Shelly2PMG3/
+  'shelly2pmg3': { 'gen': 2, 'components': { 'input:0': 'input', 'input:1': 'input', 'switch:0': 'switch', 'switch:1': 'switch' } },
 }
 
 definition = {
@@ -298,17 +300,29 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
       }
       
       # Notification of switch status: usually sent after a Switch.Set method, or via external sources ("source": "MQTT" | "WS_in" (web interface) | "switch" (physical switch))
+      # @see https://shelly-api-docs.shelly.cloud/gen2/0.14/General/Notifications/
       # ex: shellyplus1-a8032abc7158/events/rpc = {"src":"shellyplus1-a8032abc7158","dst":"shellyplus1-a8032abc7158/events","method":"NotifyStatus","params":{"ts":1646738883.91,"switch:0":{"id":0,"output":true,"source":"MQTT"}}}
       definition_extra['publish']['switch_' + str(component_id) + '_status'] = {
-        'topic': base_topic + "/events/rpc[js:payload['method'] == 'NotifyStatus' && '" + component + "' in payload['params'] && 'output' in payload['params']['" + component + "'] ]",
+        'topic': base_topic + "/events/rpc[js:(payload['method'] == 'NotifyStatus' || payload['method'] == 'NotifyFullStatus') && '" + component + "' in payload['params'] && 'output' in payload['params']['" + component + "'] ]",
         'description': _('Switch status notification'),
         'type': 'object',
         'notify_level': 'debug', 'notify': _("Shelly device '{caption}' " + component + " state is: {payload[params][" + component + "][output]}"),
         'events': {
           'output': 'js:({ value: payload["params"]["' + component + '"]["output"] ? 1 : 0, port: ' + str(component_id) + '})',
+          'energy': 'jsf:let params = {}; let p = payload["params"]["' + component + '"];' +
+            'if ("apower" in p) params.power = parseFloat(p["apower"]); ' +
+            'if ("aenergy" in p) { params.energy_total = parseFloat(p["aenergy"]["total"]) / 1000; params.energy_total_reported = parseFloat(p["aenergy"]["total"]); } ' +
+            'if ("ret_aenergy" in p) { params.energy_returned = parseFloat(p["ret_aenergy"]["total"]) / 1000; params.energy_returned_reported = parseFloat(p["ret_aenergy"]["total"]); } ' +
+            'if ("voltage" in p) params.voltage = parseFloat(p["voltage"]); ' +
+            'if ("current" in p) params.current = parseFloat(p["current"]); ' +
+            'if ("pf" in p) params.power_factor = parseFloat(p["pf"]); ' +
+            'if ("freq" in p) params.frequency = parseFloat(p["freq"]); ' +
+            'return params',
+          'temperature': 'js:("temperature" in payload["params"]["' + component + '"] ? { value: payload["params"]["' + component + '"]["temperature"]["tC"] } : null)',
           'clock': 'js:({ value: parseInt(payload["params"]["ts"]) })',
         },
       }
+      #definition_extra['events']['energy:init'] = {'energy:def': 'float', 'energy:unit': 'kWh', 'energy_reported:def': 'float', 'energy_reported:unit': 'Wh', 'energy_returned:def': 'float', 'energy_returned:unit': 'kWh', 'energy_returned_reported:def': 'float', 'energy_returned_reported:unit': 'Wh', 'power:def': 'float', 'power:unit': 'W', 'port:def': t['output_port:def']}
 
       # method Switch.GetStatus, ex: shellyplus1-a8032abc7158/rpc = {"id": "test1", "src":"shellyplus1-a8032abc7158/response", "method":"Switch.GetStatus", "params":{"id":0,"on":true}}
       definition_extra['subscribe']['switch_' + str(component_id) + '_get'] = {
@@ -337,6 +351,15 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
         'notify_level': 'debug', 'notify': _("Shelly device '{caption}' " + component + " state is: {payload[result][output]}"),
         'events': {
           'output': 'js:({ value: payload["result"]["output"] ? 1 : 0, port: ' + str(component_id) + '})',
+          'energy': 'jsf:let params = {}; let p = payload["result"];' +
+            'if ("apower" in p) params.power = parseFloat(p["apower"]); ' +
+            'if ("aenergy" in p) { params.energy_total = parseFloat(p["aenergy"]["total"]) / 1000; params.energy_total_reported = parseFloat(p["aenergy"]["total"]); } ' +
+            'if ("ret_aenergy" in p) { params.energy_returned = parseFloat(p["ret_aenergy"]["total"]) / 1000; params.energy_returned_reported = parseFloat(p["ret_aenergy"]["total"]); } ' +
+            'if ("voltage" in p) params.voltage = parseFloat(p["voltage"]); ' +
+            'if ("current" in p) params.current = parseFloat(p["current"]); ' +
+            'if ("pf" in p) params.power_factor = parseFloat(p["pf"]); ' +
+            'if ("freq" in p) params.frequency = parseFloat(p["freq"]); ' +
+            'return params',
           'temperature': 'js:("temperature" in payload["result"] ? { value: payload["result"]["temperature"]["tC"] } : null)',
         },
       }
@@ -405,6 +428,7 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
   definition_extra['actions'] = {}
   if ports['output']:
     definition_extra['events']['output:init'] = {'value:def': [0, 1], 'port:def': ports['output']}
+    definition_extra['events']['energy:init'] = {'power:def': 'float', 'power:unit': 'W', 'energy_total:def': 'float', 'energy_total:unit': 'kWh', 'energy_total_reported:def': 'float', 'energy_total_reported:unit': 'Wh', 'energy_returned:def': 'float', 'energy_returned:unit': 'kWh', 'energy_returned_reported:def': 'float', 'energy_returned_reported:unit': 'Wh', 'voltage:def': 'float', 'voltage:unit': 'V', 'current:def': 'float', 'current:unit': 'A', 'power_factor:def': 'float', 'frequency:def': 'float', 'frequency:unit': 'Hz', 'port:def': ports['output']}
     definition_extra['actions']['output-set:init'] = {'value:def': [0, 1], 'port:def': ports['output']}
     definition_extra['actions']['output-get:init'] = {'port:def': ports['output']}
   if ports['input']:
