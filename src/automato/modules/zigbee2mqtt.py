@@ -100,6 +100,15 @@ def entry_install(installer_entry, entry, conf):
           'installation_height:init': { 'value:unit': 'm' },
         },
         'check_interval': '6h', # In genere tutti i device che ho mandano almeno 1 notifica all'ora (circa, anche extender e pulsanti), però mi tengo largo e considero 6h [NOTA: In realtà il pulsante ikea manda 1 notifica ogni 24h]
+      },
+      'availability': {
+        'topic': 'zigbee2mqtt/' + str(conf["zigbee_id"]) + '/availability',
+        'description': _("Tells device {caption} is connected"),
+        'notify': _("Zigbee device '{caption}' is {payload[state]}"),
+        'notify_level': 'debug',
+        'events': {
+          'connected': 'js:({value: payload["state"] == "online"})',
+        }
       }
     },
     'subscribe': {
