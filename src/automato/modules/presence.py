@@ -155,7 +155,7 @@ def presence_check_sessions(entry):
     for method, m in list(entry.data['presence'][name]['methods'].items()):
       if m['session_length'] > 0 and now - m['lastseen'] > m['session_length']:
         del entry.data['presence'][name]['methods'][method]
-      if 'delete_at' in m and now > m['delete_at']:
+      elif 'delete_at' in m and now > m['delete_at']:
         del entry.data['presence'][name]['methods'][method]
     if not entry.data['presence'][name]['methods']:
       del entry.data['presence'][name]
