@@ -303,12 +303,12 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
       # @see https://shelly-api-docs.shelly.cloud/gen2/0.14/General/Notifications/
       # ex: shellyplus1-a8032abc7158/events/rpc = {"src":"shellyplus1-a8032abc7158","dst":"shellyplus1-a8032abc7158/events","method":"NotifyStatus","params":{"ts":1646738883.91,"switch:0":{"id":0,"output":true,"source":"MQTT"}}}
       definition_extra['publish']['switch_' + str(component_id) + '_status'] = {
-        'topic': base_topic + "/events/rpc[js:(payload['method'] == 'NotifyStatus' || payload['method'] == 'NotifyFullStatus') && '" + component + "' in payload['params'] && 'output' in payload['params']['" + component + "'] ]",
+        'topic': base_topic + "/events/rpc[js:(payload['method'] == 'NotifyStatus' || payload['method'] == 'NotifyFullStatus') && '" + component + "' in payload['params']]",
         'description': _('Switch status notification'),
         'type': 'object',
         'notify_level': 'debug', 'notify': _("Shelly device '{caption}' " + component + " state is: {payload[params][" + component + "][output]}"),
         'events': {
-          'output': 'js:({ value: payload["params"]["' + component + '"]["output"] ? 1 : 0, port: ' + str(component_id) + '})',
+          'output': 'js:("output" in payload["params"]["' + component + '"] ? { value: payload["params"]["' + component + '"]["output"] ? 1 : 0, port: ' + str(component_id) + '} : null)',
           'energy': 'jsf:let params = {}; let p = payload["params"]["' + component + '"];' +
             'if ("apower" in p) params.power = parseFloat(p["apower"]); ' +
             'if ("aenergy" in p) { params.energy_total = parseFloat(p["aenergy"]["total"]) / 1000; params.energy_total_reported = parseFloat(p["aenergy"]["total"]); } ' +
@@ -317,8 +317,9 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
             'if ("current" in p) params.current = parseFloat(p["current"]); ' +
             'if ("pf" in p) params.power_factor = parseFloat(p["pf"]); ' +
             'if ("freq" in p) params.frequency = parseFloat(p["freq"]); ' +
+            'params.port = ' + str(component_id) + '; ' +
             'return params',
-          'temperature': 'js:("temperature" in payload["params"]["' + component + '"] ? { value: payload["params"]["' + component + '"]["temperature"]["tC"] } : null)',
+          'temperature': 'js:("temperature" in payload["params"]["' + component + '"] ? { value: payload["params"]["' + component + '"]["temperature"]["tC"], port: ' + str(component_id) + '} : null)',
           'clock': 'js:({ value: parseInt(payload["params"]["ts"]) })',
         },
       }
@@ -345,12 +346,12 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
       # Response with switch status: usually sent after a Switch.GetStatus method
       # ex: shellyplus1-a8032abc7158/response/rpc = b'{"id":"test1","src":"shellyplus1-a8032abc7158","dst":"shellyplus1-a8032abc7158/response","result":{"id":0, "source":"MQTT", "output":true,"temperature":{"tC":56.5, "tF":133.8}}}
       definition_extra['publish']['switch_' + str(component_id) + '_status_response'] = {
-        'topic': base_topic + '/response/rpc[js:payload["result"]["id"] == ' + str(component_id) + ' && "output" in payload["result"]]',
+        'topic': base_topic + '/response/rpc[js:payload["result"]["id"] == ' + str(component_id) + ']',
         'description': _('Switch status response'),
         'type': 'object',
         'notify_level': 'debug', 'notify': _("Shelly device '{caption}' " + component + " state is: {payload[result][output]}"),
         'events': {
-          'output': 'js:({ value: payload["result"]["output"] ? 1 : 0, port: ' + str(component_id) + '})',
+          'output': 'js:("output" in payload["result"] ? { value: payload["result"]["output"] ? 1 : 0, port: ' + str(component_id) + '} : null)',
           'energy': 'jsf:let params = {}; let p = payload["result"];' +
             'if ("apower" in p) params.power = parseFloat(p["apower"]); ' +
             'if ("aenergy" in p) { params.energy_total = parseFloat(p["aenergy"]["total"]) / 1000; params.energy_total_reported = parseFloat(p["aenergy"]["total"]); } ' +
@@ -359,11 +360,33 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
             'if ("current" in p) params.current = parseFloat(p["current"]); ' +
             'if ("pf" in p) params.power_factor = parseFloat(p["pf"]); ' +
             'if ("freq" in p) params.frequency = parseFloat(p["freq"]); ' +
+            'params.port = ' + str(component_id) + '; ' +
             'return params',
-          'temperature': 'js:("temperature" in payload["result"] ? { value: payload["result"]["temperature"]["tC"] } : null)',
+          'temperature': 'js:("temperature" in payload["result"] ? { value: payload["result"]["temperature"]["tC"], port: ' + str(component_id) + '} : null)',
         },
       }
-      
+
+      definition_extra['publish']['switch_' + str(component_id) + '_fullstatus'] = {
+        'topic': '/^' + base_topic + '/status/switch:' + str(component_id) + '$/',
+        'description': _('Switch full status'),
+        'type': 'object',
+        'notify_level': 'debug', 'notify': _("Shelly device '{caption}' " + component + " full status is: {payload}"),
+        'events': {
+          'output': 'js:("output" in payload ? { value: payload["output"] ? 1 : 0, port: ' + str(component_id) + '} : null)',
+          'energy': 'jsf:let params = {}; let p = payload;' +
+            'if ("apower" in p) params.power = parseFloat(p["apower"]); ' +
+            'if ("aenergy" in p) { params.energy_total = parseFloat(p["aenergy"]["total"]) / 1000; params.energy_total_reported = parseFloat(p["aenergy"]["total"]); } ' +
+            'if ("ret_aenergy" in p) { params.energy_returned = parseFloat(p["ret_aenergy"]["total"]) / 1000; params.energy_returned_reported = parseFloat(p["ret_aenergy"]["total"]); } ' +
+            'if ("voltage" in p) params.voltage = parseFloat(p["voltage"]); ' +
+            'if ("current" in p) params.current = parseFloat(p["current"]); ' +
+            'if ("pf" in p) params.power_factor = parseFloat(p["pf"]); ' +
+            'if ("freq" in p) params.frequency = parseFloat(p["freq"]); ' +
+            'params.port = ' + str(component_id) + '; ' +
+            'return params',
+          'temperature': 'js:("temperature" in payload ? { value: payload["temperature"]["tC"], port: ' + str(component_id) + '} : null)',
+        },
+      }
+
     elif device_conf['components'][component] == 'input':
       ports['input'].append(component_id)
       
