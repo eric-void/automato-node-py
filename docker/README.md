@@ -79,6 +79,14 @@ fails. Pass test unit names to run only a subset, for example:
 automato-node-py/bin/docker-tests.sh shelly_test net_test
 ```
 
+The test image uses Python 3.13 by default. golconda runs Python 3.11, so the
+suite can also be run on it with `PYTHON_VERSION` (each version gets its own
+image, `automato-node-tests:py<version>`):
+
+```sh
+PYTHON_VERSION=3.11 automato-node-py/bin/docker-tests.sh
+```
+
 `AUTOMATO_TEST_CONFIG` can point `bin/all-tests.sh` at a different config
 when running the suite directly. The Docker runner uses the bundled
 `docker/test-config.json`, which connects to the Compose service named

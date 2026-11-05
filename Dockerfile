@@ -1,4 +1,7 @@
-FROM python:3.13-slim
+# 3.13 is the default (sauron, limited by Js2Py); golconda runs 3.11, so
+# the test image can also be built with --build-arg PYTHON_VERSION=3.11.
+ARG PYTHON_VERSION=3.13
+FROM python:${PYTHON_VERSION}-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

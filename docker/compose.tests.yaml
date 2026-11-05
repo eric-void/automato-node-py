@@ -15,6 +15,11 @@ services:
     build:
       context: ../..
       dockerfile: automato-node-py/Dockerfile
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
+    # One image per Python version, so builds with different versions do not
+    # overwrite each other.
+    image: automato-node-tests:py${PYTHON_VERSION:-3.13}
     entrypoint: ["/opt/automato/automato-node-py/bin/all-tests.sh"]
     command: []
     environment:

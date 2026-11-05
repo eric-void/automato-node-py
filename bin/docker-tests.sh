@@ -1,4 +1,6 @@
 #!/bin/sh
+# Set PYTHON_VERSION (e.g. 3.11, the golconda version) to build and run the
+# tests on another Python; the default is 3.13.
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 COMPOSE_FILE="$SCRIPT_DIR/../docker/compose.tests.yaml"
