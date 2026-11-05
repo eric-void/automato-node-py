@@ -78,6 +78,9 @@ def start(entry):
   publish_metadata(entry, entry.topic('./metadata'))
 
 def on_metadata(entry, subscribed_message):
+  # The node is connected to the broker some time before "start" is called. Metadata received in this time can be ignored: "start" publishes metadata of this node, and other nodes will answer with their own
+  if 'seen' not in entry.data:
+    return
   payload = subscribed_message.payload
   if payload and 'from_node' in payload and payload['from_node'] != system.default_node_name and 'time' in payload and system.time() - payload['time'] < utils.read_duration(entry.config['dead_time']):
     entry.data['seen'][payload['from_node']] = { 'my_time': system.time(), 'his_time': payload['time'] }
@@ -105,6 +108,9 @@ def on_metadata(entry, subscribed_message):
     #logging.debug('#{id}> Loaded new metadata: {todo}, mynodes: {nodes}, extnodes: {nodes}, current entries: {entries}'.format(id = entry.id, todo = todo, mynodes = entry.data['nodes'], nodes = payload['nodes'], entries = ", ".join(system.entries.keys())))
 
 def publish_metadata(entry, topic, local_metadata = None):
+  # See on_metadata: requests received before "start" are satisfied by the publish done in "start"
+  if 'nodes' not in entry.data:
+    return
   entry.publish(topic, {
     'from_node': system.default_node_name,
     'time': system.time(),

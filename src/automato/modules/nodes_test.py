@@ -1,6 +1,8 @@
 # require python3
 # -*- coding: utf-8 -*-
 
+import types
+
 from automato.core import test
 from automato.core import system
 from automato.node import node_system as node
@@ -46,6 +48,16 @@ def test_init():
 
 def test_run(entries):
   global t0
+  
+  # The node is connected to the broker before "start" is called: messages received in this time are ignored, with no errors
+  nodes_entry = entries['nodes@TEST']
+  metadata = types.SimpleNamespace(payload = { 'from_node': 'OTHERNODE', 'time': system.time(), 'nodes': {}, 'entries': {} })
+  test.assertx('before-start', assertEq = [
+    ('seen' in nodes_entry.data, False),
+    (nodes_entry.module.on_metadata(nodes_entry, metadata), None),
+    (nodes_entry.module.publish_metadata(nodes_entry, nodes_entry.topic('./metadata')), None),
+    ('seen' in nodes_entry.data, False),
+  ])
   
   # TODO Mi tocca farlo perchè "test" non avvia system.run()
   node.entries_invoke_threaded('start')
