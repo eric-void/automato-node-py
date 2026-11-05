@@ -36,6 +36,7 @@ from automato.modules import owrtwifi2mqtt_test
 from automato.modules import scheduler_test
 from automato.modules import influxdb_test
 from automato.modules import nut_test
+from automato.modules import notifications_test
 
 def init_base():
   global config, args
@@ -208,7 +209,7 @@ def boot_test():
   
   node_system.system.test_mode = True
   
-  tests = [ system_test, node_system_test, nodes_test, health_test, toggle_test, shelly_test, tasmota_test, rf_listener_test, rf2mqtt_listener_test, location_owntracks_test, net_test, net_sniffer_scapy_test, net_sniffer_test, presence_test, owrtwifi2mqtt_test, scheduler_test, influxdb_test, nut_test ] if args.test == "*" else [ globals()[args.test] ]
+  tests = [ system_test, node_system_test, nodes_test, health_test, toggle_test, shelly_test, tasmota_test, rf_listener_test, rf2mqtt_listener_test, location_owntracks_test, net_test, net_sniffer_scapy_test, net_sniffer_test, presence_test, owrtwifi2mqtt_test, scheduler_test, influxdb_test, nut_test, notifications_test ] if args.test == "*" else [ globals()[args.test] ]
   
   success = True
   try:
