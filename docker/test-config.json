@@ -1,0 +1,10 @@
+{
+  "name": "automato-test",
+  "mqtt": {
+    "broker_host": "mosquitto",
+    "broker_port": 1883
+  },
+  "storage": "/tmp/automato-test-storage",
+  "console-log": true,
+  "entries": []
+}

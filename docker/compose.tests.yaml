@@ -1,0 +1,28 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: "no"
+    volumes:
+      - ./mosquitto-test.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h 127.0.0.1 -t healthcheck -m ok"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 2s
+
+  test-runner:
+    build:
+      context: ../..
+      dockerfile: automato-node-py/Dockerfile
+    entrypoint: ["/opt/automato/automato-node-py/bin/all-tests.sh"]
+    command: []
+    environment:
+      # Test fixtures (tasmota, scheduler) expect local times in Europe/Rome
+      TZ: Europe/Rome
+      AUTOMATO_TEST_CONFIG: /opt/automato/automato-node-py/docker/test-config.json
+      AUTOMATO_STORAGE_DIR: /tmp/automato-test-storage
+      AUTOMATO_LOG_DIR: /tmp/automato-test-logs
+    depends_on:
+      mosquitto:
+        condition: service_healthy

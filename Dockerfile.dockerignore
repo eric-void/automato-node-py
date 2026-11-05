@@ -1,0 +1,11 @@
+**
+!automato-node-py/
+!automato-node-py/**
+!automato-core-py/
+!automato-core-py/requirements.txt
+!automato-core-py/src/
+!automato-core-py/src/**
+automato-node-py/.git
+automato-core-py/.git
+**/__pycache__
+**/*.pyc

@@ -1,0 +1,15 @@
+services:
+  automato-node:
+    build:
+      context: ../..
+      dockerfile: automato-node-py/Dockerfile
+    container_name: automato-node
+    restart: unless-stopped
+    init: true
+    environment:
+      AUTOMATO_STORAGE_DIR: /var/lib/automato
+      AUTOMATO_LOG_DIR: /var/log/automato
+    volumes:
+      - ${AUTOMATO_CONFIG_DIR:-./automato-config}:/etc/automato:ro
+      - ${AUTOMATO_DATA_DIR:-./automato-data}:/var/lib/automato
+      - ${AUTOMATO_LOG_HOST_DIR:-./automato-logs}:/var/log/automato

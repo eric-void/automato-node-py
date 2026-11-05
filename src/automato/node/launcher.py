@@ -140,6 +140,25 @@ def init_config():
   if 'mqtt' not in config:
     config['mqtt'] = {}
 
+  # Container deployments can keep runtime data and logs on separate mounts,
+  # without changing the location used for config includes and local modules.
+  storage_dir = os.environ.get('AUTOMATO_STORAGE_DIR')
+  if storage_dir:
+    config['storage'] = storage_dir
+  elif 'storage' not in config:
+    config['storage'] = 'data'
+
+  log_dir = os.environ.get('AUTOMATO_LOG_DIR')
+  if log_dir:
+    for key in ('log', 'error-log', 'messages-log', 'debug-log'):
+      if config.get(key):
+        config[key] = os.path.join(log_dir, os.path.basename(config[key]))
+
+  if config.get('storage'):
+    os.makedirs(config['storage'] if os.path.isabs(config['storage']) else os.path.join(config['base_path'], config['storage']), exist_ok=True)
+  if log_dir:
+    os.makedirs(log_dir, exist_ok=True)
+
   if args.client_id:
     config['mqtt']['client_id'] = args.client_id
     config['mqtt']['client_id_random_postfix'] = False
@@ -162,7 +181,7 @@ def boot():
   if args.topic:
     boot_publish()
   elif args.test:
-    boot_test()
+    return boot_test()
   else:
     init_env()
     try:
@@ -191,6 +210,7 @@ def boot_test():
   
   tests = [ system_test, node_system_test, nodes_test, health_test, toggle_test, shelly_test, tasmota_test, rf_listener_test, rf2mqtt_listener_test, location_owntracks_test, net_test, net_sniffer_scapy_test, net_sniffer_test, presence_test, owrtwifi2mqtt_test, scheduler_test, influxdb_test, nut_test ] if args.test == "*" else [ globals()[args.test] ]
   
+  success = True
   try:
     for unit in tests:
       test_config['entries'] = {}
@@ -204,12 +224,14 @@ def boot_test():
 
   except KeyboardInterrupt:
     logging.info('keyboard interrupt')
+    success = False
   except:
     logging.exception('system failure')
+    success = False
   finally:
     destroy()
     
-  test.summary()
+  return test.summary() and success
 
 def boot_publish():
   global args
@@ -217,7 +239,7 @@ def boot_publish():
   destroy()
   
 if __name__ == '__main__':
-  boot()
+  sys.exit(0 if boot() else 1)
 
 '''
 # https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting
