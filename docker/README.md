@@ -35,6 +35,9 @@ docker compose up -d --build
 docker compose logs -f
 ```
 
+The node runs in the `Europe/Rome` time zone (cron schedules and local times
+depend on it); set `TZ` in the environment to use another one.
+
 The config directory is mounted read-only at `/etc/automato`, persistent node
 storage at `/var/lib/automato`, and logs at `/var/log/automato`. Compose can
 also use alternate host paths through `AUTOMATO_CONFIG_DIR`,

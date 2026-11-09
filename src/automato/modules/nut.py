@@ -10,6 +10,7 @@ Uses official "PyNUT" module: https://github.com/networkupstools/nut/tree/master
 
 The module has no official pip package.
 You need to manual copy the library file in python "site-packages" dir.
+On Python 3.13+ use NUT v2.8.4 or later: older versions need telnetlib, removed in Python 3.13.
 
 EXAMPLE OF MANUAL INSTALLATION:
 (this works in Arch Linux, other distrubution paths may vary)

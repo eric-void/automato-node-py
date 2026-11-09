@@ -1,33 +1,25 @@
 # Known issues (Docker test run)
 
 Issues found running `bin/docker-tests.sh` (Python 3.13, 2026-10-28). Last run
-(2026-11-09): 17/17 test units pass, also `shelly_test` and `net_test` on
-Python 3.11.
+(2026-11-09): 18/18 test units pass (`nut_test` included).
 
 ## Open
 
-### `nut-requirements.txt` lists the wrong package
-
-`src/automato/modules/nut-requirements.txt` requires `nut2`, but `nut.py`
-imports `PyNUT` (NUT's own client module, not on PyPI; see the module
-docstring). `nut2` provides a `nut2` module instead, and fails to build on
-Python 3.13 (`telnetlib` was removed). The Dockerfile no longer uses this file
-and downloads `PyNUT.py` from NUT v2.8.4 (socket based, no `telnetlib`).
-`requirements-all.txt` does not include it either.
-
-### `nut_test` is not in `bin/all-tests.sh`
-
-`launcher.py` runs `nut_test` with `--test '*'`, but `bin/all-tests.sh` (and so
-the Docker runner) does not include it in the default list.
-
-### Production `compose.yaml` has no time zone
-
-The test runner sets `TZ: Europe/Rome`, required by tasmota and scheduler
-fixtures. `compose.yaml` does not set `TZ`, so a containerized node runs in UTC:
-cron schedules and local-time conversions would differ from a host install.
+None.
 
 ## Fixed in the Docker setup
 
+- `nut_test` was not in `bin/all-tests.sh`, and once added it failed
+  `t4-changes`: `./var/ups_status` generates one `output` event per port, and
+  `assertSomeEvents` in core `test.py` saw only the last one (events were
+  indexed by name). It now matches any event with that name. The test is in
+  the default list.
+- `nut-requirements.txt` required `nut2`, a different client (module `nut2`,
+  does not build on Python 3.13), while `nut.py` imports `PyNUT`, which has no
+  pip package. The file now only documents the manual install (NUT v2.8.4+ on
+  Python 3.13, as the Dockerfile does).
+- Production `compose.yaml` had no time zone, so a containerized node ran in
+  UTC: it now sets `TZ: ${TZ:-Europe/Rome}`, as `config/sauron-docker` does.
 - `shelly_test`: gen2 switch status always emitted an `energy` event, empty
   (only the `energy:init` definitions) when the payload had no energy fields.
   The `energy` script now returns `null` in that case; added `g2_energy` with
