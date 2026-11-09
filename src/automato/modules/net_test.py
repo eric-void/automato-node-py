@@ -25,12 +25,12 @@ def test_init():
   })
 
 def test_run(entries):
-  test.assertx('t1-http', assertSubscribe = {'net/wan-connected': '1'}, assertEvents = {'connected': {'value': 1, 'port': 'wan'}}, wait = False)
+  test.assertx('t1-http', assertSubscribe = {'net/wan-connected': '1'}, assertEventsTopic = 'net/wan-connected', assertEvents = {'connected': {'value': 1, 'port': 'wan'}}, wait = False)
   node_system.run_step()
   test.waitRunning()
   
   entries['net@TEST'].config["wan-connected-check-method"] = "ping"
-  test.assertx('t2-ping', assertSubscribe = {'net/wan-connected': '1'}, assertEvents = {'connected': {'value': 1, 'port': 'wan'}}, wait = False)
+  test.assertx('t2-ping', assertSubscribe = {'net/wan-connected': '1'}, assertEventsTopic = 'net/wan-connected', assertEvents = {'connected': {'value': 1, 'port': 'wan'}}, wait = False)
   system.sleep(1)
   node_system.run_step()
   test.waitRunning()

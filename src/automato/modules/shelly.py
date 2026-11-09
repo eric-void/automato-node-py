@@ -246,6 +246,23 @@ def entry_install(installer_entry, entry, conf):
   *2020-08-20 15:16:33 shellies/announce {"id":"shellydimmer2-E09806966EFB","model":"SHDM-2","mac":"E09806966EFB","ip":"192.168.2.229","new_fw":false,"fw_ver":"20200818-121046/v1.8.2@36539b0b"}
   """
 
+def _gen2_energy_event(p, component_id):
+  """
+  Script for the "energy" event of a gen2+ switch status (p is the js expression of the status object).
+  Returns null if the status has no energy fields (ex: a NotifyStatus with only "output").
+  """
+  return ('jsf:let params = {}; let p = ' + p + ';' +
+    'if ("apower" in p) params.power = parseFloat(p["apower"]); ' +
+    'if ("aenergy" in p) { params.energy_total = parseFloat(p["aenergy"]["total"]) / 1000; params.energy_total_reported = parseFloat(p["aenergy"]["total"]); } ' +
+    'if ("ret_aenergy" in p) { params.energy_returned = parseFloat(p["ret_aenergy"]["total"]) / 1000; params.energy_returned_reported = parseFloat(p["ret_aenergy"]["total"]); } ' +
+    'if ("voltage" in p) params.voltage = parseFloat(p["voltage"]); ' +
+    'if ("current" in p) params.current = parseFloat(p["current"]); ' +
+    'if ("pf" in p) params.power_factor = parseFloat(p["pf"]); ' +
+    'if ("freq" in p) params.frequency = parseFloat(p["freq"]); ' +
+    'if (Object.keys(params).length == 0) return null; ' +
+    'params.port = ' + str(component_id) + '; ' +
+    'return params')
+
 def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
   
   #t = {x: y for x, y in { **default_def, **device_types[device_type] }.items() if y is not None}
@@ -309,16 +326,7 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
         'notify_level': 'debug', 'notify': _("Shelly device '{caption}' " + component + " state is: {payload[params][" + component + "][output]}"),
         'events': {
           'output': 'js:("output" in payload["params"]["' + component + '"] ? { value: payload["params"]["' + component + '"]["output"] ? 1 : 0, port: ' + str(component_id) + '} : null)',
-          'energy': 'jsf:let params = {}; let p = payload["params"]["' + component + '"];' +
-            'if ("apower" in p) params.power = parseFloat(p["apower"]); ' +
-            'if ("aenergy" in p) { params.energy_total = parseFloat(p["aenergy"]["total"]) / 1000; params.energy_total_reported = parseFloat(p["aenergy"]["total"]); } ' +
-            'if ("ret_aenergy" in p) { params.energy_returned = parseFloat(p["ret_aenergy"]["total"]) / 1000; params.energy_returned_reported = parseFloat(p["ret_aenergy"]["total"]); } ' +
-            'if ("voltage" in p) params.voltage = parseFloat(p["voltage"]); ' +
-            'if ("current" in p) params.current = parseFloat(p["current"]); ' +
-            'if ("pf" in p) params.power_factor = parseFloat(p["pf"]); ' +
-            'if ("freq" in p) params.frequency = parseFloat(p["freq"]); ' +
-            'params.port = ' + str(component_id) + '; ' +
-            'return params',
+          'energy': _gen2_energy_event('payload["params"]["' + component + '"]', component_id),
           'temperature': 'js:("temperature" in payload["params"]["' + component + '"] ? { value: payload["params"]["' + component + '"]["temperature"]["tC"], port: ' + str(component_id) + '} : null)',
           'clock': 'js:({ value: parseInt(payload["params"]["ts"]) })',
         },
@@ -352,16 +360,7 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
         'notify_level': 'debug', 'notify': _("Shelly device '{caption}' " + component + " state is: {payload[result][output]}"),
         'events': {
           'output': 'js:("output" in payload["result"] ? { value: payload["result"]["output"] ? 1 : 0, port: ' + str(component_id) + '} : null)',
-          'energy': 'jsf:let params = {}; let p = payload["result"];' +
-            'if ("apower" in p) params.power = parseFloat(p["apower"]); ' +
-            'if ("aenergy" in p) { params.energy_total = parseFloat(p["aenergy"]["total"]) / 1000; params.energy_total_reported = parseFloat(p["aenergy"]["total"]); } ' +
-            'if ("ret_aenergy" in p) { params.energy_returned = parseFloat(p["ret_aenergy"]["total"]) / 1000; params.energy_returned_reported = parseFloat(p["ret_aenergy"]["total"]); } ' +
-            'if ("voltage" in p) params.voltage = parseFloat(p["voltage"]); ' +
-            'if ("current" in p) params.current = parseFloat(p["current"]); ' +
-            'if ("pf" in p) params.power_factor = parseFloat(p["pf"]); ' +
-            'if ("freq" in p) params.frequency = parseFloat(p["freq"]); ' +
-            'params.port = ' + str(component_id) + '; ' +
-            'return params',
+          'energy': _gen2_energy_event('payload["result"]', component_id),
           'temperature': 'js:("temperature" in payload["result"] ? { value: payload["result"]["temperature"]["tC"], port: ' + str(component_id) + '} : null)',
         },
       }
@@ -373,16 +372,7 @@ def entry_install_gen2(installer_entry, entry, conf, device_type, device_conf):
         'notify_level': 'debug', 'notify': _("Shelly device '{caption}' " + component + " full status is: {payload}"),
         'events': {
           'output': 'js:("output" in payload ? { value: payload["output"] ? 1 : 0, port: ' + str(component_id) + '} : null)',
-          'energy': 'jsf:let params = {}; let p = payload;' +
-            'if ("apower" in p) params.power = parseFloat(p["apower"]); ' +
-            'if ("aenergy" in p) { params.energy_total = parseFloat(p["aenergy"]["total"]) / 1000; params.energy_total_reported = parseFloat(p["aenergy"]["total"]); } ' +
-            'if ("ret_aenergy" in p) { params.energy_returned = parseFloat(p["ret_aenergy"]["total"]) / 1000; params.energy_returned_reported = parseFloat(p["ret_aenergy"]["total"]); } ' +
-            'if ("voltage" in p) params.voltage = parseFloat(p["voltage"]); ' +
-            'if ("current" in p) params.current = parseFloat(p["current"]); ' +
-            'if ("pf" in p) params.power_factor = parseFloat(p["pf"]); ' +
-            'if ("freq" in p) params.frequency = parseFloat(p["freq"]); ' +
-            'params.port = ' + str(component_id) + '; ' +
-            'return params',
+          'energy': _gen2_energy_event('payload', component_id),
           'temperature': 'js:("temperature" in payload ? { value: payload["temperature"]["tC"], port: ' + str(component_id) + '} : null)',
         },
       }

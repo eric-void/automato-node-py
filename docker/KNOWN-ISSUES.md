@@ -1,38 +1,10 @@
 # Known issues (Docker test run)
 
-Issues found running `bin/docker-tests.sh` (Python 3.13, 2026-10-28). Last run:
-15/17 test units pass; `shelly_test` and `net_test` fail.
+Issues found running `bin/docker-tests.sh` (Python 3.13, 2026-10-28). Last run
+(2026-11-09): 17/17 test units pass, also `shelly_test` and `net_test` on
+Python 3.11.
 
 ## Open
-
-### shelly_test: gen2 switch status emits an empty `energy` event
-
-Failing asserts: `g2_get_on`, `g2_get_off`, `g2_get_response` (27/30 OK).
-
-Since commit `f8c72a3` ("Shelly: support for gen2+ energy events and
-shelly2pmg3"), the gen2 `switch_N_status` and `switch_N_get` handlers in
-`src/automato/modules/shelly.py` always produce an `energy` event. When the
-payload has no `apower`/`aenergy`/`voltage`/... fields the `jsf:` script returns
-`{}`, so the event carries only the `energy:init` definitions (`power:def`,
-`power:unit`, ...) and no values. The tests in `shelly_test.py` were not updated
-and do not expect it.
-
-Likely fix: return `null` from the `energy` script when no field is present (as
-the `temperature` event already does), instead of changing the tests. Should add
-a test with a payload that does contain energy fields.
-
-### net_test: `t2-ping` gets no `connected` event
-
-Failing assert: `t2-ping.events` (3/4 OK). `ping` works in the container and
-`net/wan-connected = 1` is published and received (`subscribe_payload` OK), but
-no `connected` event is generated. Probably because `t1-http` already
-produced the same value (`connected = 1`, port `wan`) and the event is not
-re-emitted for an unchanged value. Not yet investigated: check event
-deduplication/`changed` handling in `net.py`, or reset state between t1 and t2
-in `net_test.py`.
-
-Neither failure has been checked outside Docker: the host has no Python
-environment for automato (Python 3.14, no `js2py`).
 
 ### `nut-requirements.txt` lists the wrong package
 
@@ -56,6 +28,15 @@ cron schedules and local-time conversions would differ from a host install.
 
 ## Fixed in the Docker setup
 
+- `shelly_test`: gen2 switch status always emitted an `energy` event, empty
+  (only the `energy:init` definitions) when the payload had no energy fields.
+  The `energy` script now returns `null` in that case; added `g2_energy` with
+  a payload that has them. The test also expected `temperature` without
+  `port`, added on purpose in `30611f8`.
+- `net_test`: `t2-ping` failed because of the broker healthcheck, not the
+  `net` module. A check without `assertEventsTopic` matches any message, and
+  the `healthcheck` message published every 2s by `mosquitto_pub` (no events)
+  arrived first. The asserts now name the `net/wan-connected` topic.
 - Js2Py fork not installed: PyPI's `Js2Py 0.74` (from core requirements) has
   the same version as the fork, so pip kept it and `import js2py` failed on
   Python 3.13 ("Your python version made changes to the bytecode"). The fork is
