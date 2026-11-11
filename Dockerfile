@@ -23,14 +23,11 @@ COPY automato-node-py /opt/automato/automato-node-py
 WORKDIR /opt/automato/automato-node-py
 # The Js2Py fork has the same version as PyPI's Js2Py, so it must be installed
 # first: otherwise pip keeps the PyPI release, which fails on Python > 3.11.
-# PyNUT (used by the nut module) has no pip package: v2.8.4+ no longer needs
-# telnetlib, which was removed in Python 3.13.
 RUN pip install --no-cache-dir 'Js2Py @ git+https://github.com/a-j-albert/Js2Py.git@cc64a715727f110b79310b8031e0ade9c501d5d3' \
     && pip install --no-cache-dir -r requirements-all.txt \
     && pip install --no-cache-dir -r /opt/automato/automato-core-py/requirements.txt \
     && pip install --no-cache-dir selenium pygsheets \
-    && python -c "import site, urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/networkupstools/nut/v2.8.4/scripts/python/module/PyNUT.py.in', site.getsitepackages()[0] + '/PyNUT.py')" \
-    && python -c "import js2py, PyNUT; js2py.eval_js('1 + 1')"
+    && python -c "import js2py; from PyNUTClient import PyNUT; import solaredge_modbus, telegram.ext; js2py.eval_js('1 + 1')"
 
 ENV PYTHONPATH=/opt/automato/automato-node-py/src:/opt/automato/automato-core-py/src
 USER automato:automato

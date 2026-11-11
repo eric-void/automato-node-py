@@ -5,9 +5,11 @@
 -r requirements.txt
 -r src/automato/modules/astral2-requirements.txt
 -r src/automato/modules/net-requirements.txt
+-r src/automato/modules/net_ping-requirements.txt
 -r src/automato/modules/http-request-requirements.txt
 -r src/automato/modules/net_sniffer_scapy-requirements.txt
 -r src/automato/modules/notifications-webpush-requirements.txt
+-r src/automato/modules/nut-requirements.txt
 #-r src/automato/modules/rf_listener-requirements.txt
 -r src/automato/modules/speedtest-requirements.txt
 -r src/automato/modules/telegram-requirements.txt

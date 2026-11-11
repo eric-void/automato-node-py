@@ -1,2 +1,3 @@
 # https://github.com/python-telegram-bot/python-telegram-bot
-python-telegram-bot >= 12.5.0, < 13.12
+# v22 API (asyncio): major versions remove deprecated calls, check the changelog before allowing v23
+python-telegram-bot >= 22.0, < 23

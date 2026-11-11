@@ -1,7 +1,8 @@
 # Known issues (Docker test run)
 
 Issues found running `bin/docker-tests.sh` (Python 3.13, 2026-10-28). Last run
-(2026-11-09): 18/18 test units pass (`nut_test` included).
+(2026-11-11, Python 3.13 and 3.11): 20/20 test units pass (`nut_test` and
+`telegram_test` included).
 
 ## Open
 
@@ -17,7 +18,9 @@ None.
 - `nut-requirements.txt` required `nut2`, a different client (module `nut2`,
   does not build on Python 3.13), while `nut.py` imports `PyNUT`, which has no
   pip package. The file now only documents the manual install (NUT v2.8.4+ on
-  Python 3.13, as the Dockerfile does).
+  Python 3.13, as the Dockerfile does). Update (2026-11-11): NUT now publishes
+  the official `pynutclient` pip package (module `PyNUTClient.PyNUT`), used by
+  `nut.py` and installed from `nut-requirements.txt`.
 - Production `compose.yaml` had no time zone, so a containerized node ran in
   UTC: it now sets `TZ: ${TZ:-Europe/Rome}`, as `config/sauron-docker` does.
 - `shelly_test`: gen2 switch status always emitted an `energy` event, empty

@@ -8,23 +8,20 @@ Uses official "PyNUT" module: https://github.com/networkupstools/nut/tree/master
 - PyNUT code example (test): https://github.com/networkupstools/nut/blob/master/scripts/python/module/test_nutclient.py.in
 - PyNUT code example (monitor app): https://github.com/networkupstools/nut/blob/master/scripts/python/app/NUT-Monitor-py3qt5.in
 
-The module has no official pip package.
-You need to manual copy the library file in python "site-packages" dir.
+Install it with pip: "pip3 install pynutclient" (official NUT package, see nut-requirements.txt),
+it provides "PyNUTClient.PyNUT".
+A "PyNUT.py" file copied by hand into python "site-packages" (the old installation method) still works.
 On Python 3.13+ use NUT v2.8.4 or later: older versions need telnetlib, removed in Python 3.13.
-
-EXAMPLE OF MANUAL INSTALLATION:
-(this works in Arch Linux, other distrubution paths may vary)
-
-git clone https://github.com/networkupstools/nut.git
-for i in /usr/lib/python*/site-packages/; do sudo cp nut/scripts/python/module/PyNUT.py.in ${i}PyNUT.py; done;
-rm -rf nut
 
 """
 
 import logging
 import re
 import sys
-import PyNUT
+try:
+  from PyNUTClient import PyNUT
+except ImportError:
+  import PyNUT
 
 from automato.core import system
 from automato.core import utils

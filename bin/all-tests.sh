@@ -8,7 +8,8 @@ if [ "$#" -eq 0 ]; then
   set -- system_test node_system_test health_test scheduler_test toggle_test \
     shelly_test tasmota_test rf_listener_test rf2mqtt_listener_test \
     location_owntracks_test net_test net_sniffer_test net_sniffer_scapy_test \
-    presence_test nodes_test owrtwifi2mqtt_test influxdb_test notifications_test nut_test
+    presence_test nodes_test owrtwifi2mqtt_test influxdb_test notifications_test nut_test \
+    telegram_test
 fi
 
 failed=0

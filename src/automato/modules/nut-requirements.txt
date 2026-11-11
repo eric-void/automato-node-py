@@ -1,5 +1,4 @@
-# PyNUT (NUT's own python client, imported by nut.py) has no pip package:
-# copy PyNUT.py.in from https://github.com/networkupstools/nut/tree/master/scripts/python/module
-# into python "site-packages" as PyNUT.py (see nut.py docstring).
-# Use NUT v2.8.4 or later on Python 3.13+: older versions need telnetlib, removed in 3.13.
-# (The "nut2" pip package is a different client, with a "nut2" module, and does not build on Python 3.13.)
+# https://pypi.org/project/pynutclient/ (official NUT python client, module "PyNUTClient.PyNUT")
+# Use v2.8.4 or later on Python 3.13+: older versions need telnetlib, removed in 3.13.
+# (The "nut2" pip package is a different client, with a "nut2" module, and is not used.)
+pynutclient >= 2.8.4
