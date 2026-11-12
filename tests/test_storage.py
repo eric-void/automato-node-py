@@ -134,6 +134,19 @@ class StorageTest(unittest.TestCase):
       # The first check is spread in the first interval, then every 10 seconds
       self.assertIn(s.call_count, [3, 4])
 
+  def test_data_lock_is_not_held_while_writing(self):
+    e = make_entry()
+    e.data = {'a': 1}
+    locked = []
+    original = storage._storeDataTo
+    def check(entry, filename, data):
+      locked.append(entry.data_lock.locked())
+      return original(entry, filename, data)
+    with mock.patch.object(storage, '_storeDataTo', side_effect = check):
+      self.assertTrue(e.store_data())
+    self.assertEqual(locked, [False, False])
+    self.assertEqual(self.read(e), {'a': 1})
+
   def test_non_blocking_store_skips_if_locked(self):
     e = make_entry()
     e.data = {'a': 1}

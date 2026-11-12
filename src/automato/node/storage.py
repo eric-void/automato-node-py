@@ -5,6 +5,8 @@ import logging
 import os
 import json
 import zlib
+import hashlib
+import threading
 
 from automato.core import system
 from automato.core import utils
@@ -25,6 +27,7 @@ def entry_install(self, entry):
   entry.store_data = lambda blocking = True, timeout = -1: storeData(entry, blocking, timeout)
   entry.store_data_saved = None
   entry.store_backup_saved = None
+  entry.store_write_lock = threading.Lock()
   entry.store_backup_time = 0
   # First periodic check is spread over the interval, so entries are not all checked in the same second
   entry.store_data_next = 0
@@ -50,7 +53,7 @@ def retrieveData(entry):
     loaded = _retrieveDataFrom(entry, entry.node_name + '_data_' + entry.id_local + '.json')
     if loaded:
       # Data is the same as the stored one: no need to write it back until it changes
-      entry.store_data_saved = repr(entry.data)
+      entry.store_data_saved = _data_signature(entry.data)
     else:
       loaded = _retrieveDataFrom(entry, entry.node_name + '_data_' + entry.id_local + '.backup.json')
   finally:
@@ -90,38 +93,46 @@ def storeDataIfDue(entry, now, interval = STORAGE_CHECK_INTERVAL):
   entry.store_data_next = now + interval
   return storeData(entry, False)
 
+def _data_signature(data):
+  # A digest of repr(data) is kept, instead of the repr itself (data can be big)
+  return hashlib.md5(repr(data).encode('utf-8', 'backslashreplace')).digest()
+
 def storeData(entry, blocking = True, timeout = -1):
   """
   Store entry data, if changed from last store. A backup copy is written every STORAGE_BACKUP_TIME seconds, if data changed from last backup.
-  @param blocking, timeout passed to entry.data_lock.acquire (if lock can't be acquired, data is not stored)
+  entry.data_lock is held only to take a snapshot of data (json), not during file writing (that can be slow, with fsync on a slow disk): scripts and handlers of the entry are not blocked by it.
+  Writes of the same entry are serialized by entry.store_write_lock (so an older snapshot can't overwrite a newer one).
+  @param blocking, timeout passed to locks acquire (if locks can't be acquired, data is not stored)
   """
   if not entry.data and entry.store_data_saved is None:
     return False
-  if not entry.data_lock.acquire(blocking, timeout if blocking else -1):
+  if not entry.store_write_lock.acquire(blocking, timeout if blocking else -1):
     return False
   _s = system._stats_start()
   try:
-    cmpdata = repr(entry.data)
-    data = None
-    if entry.store_data_saved != cmpdata:
-      data = utils.json_export(entry.data)
-      if data is None:
-        return False
-      if _storeDataTo(entry, entry.node_name + '_data_' + entry.id_local + '.json', data):
-        entry.store_data_saved = cmpdata
-    if entry.store_backup_saved != cmpdata and system.time() - entry.store_backup_time > STORAGE_BACKUP_TIME:
-      if data is None:
-        data = utils.json_export(entry.data)
-      if data is not None and _storeDataTo(entry, entry.node_name + '_data_' + entry.id_local + '.backup.json', data):
-        entry.store_backup_saved = cmpdata
-        entry.store_backup_time = system.time()
+    if not entry.data_lock.acquire(blocking, timeout if blocking else -1):
+      return False
+    try:
+      signature = _data_signature(entry.data)
+      write_data = entry.store_data_saved != signature
+      write_backup = entry.store_backup_saved != signature and system.time() - entry.store_backup_time > STORAGE_BACKUP_TIME
+      data = utils.json_export(entry.data) if write_data or write_backup else None
+    finally:
+      entry.data_lock.release()
 
+    if data is None:
+      return not (write_data or write_backup)
+    if write_data and _storeDataTo(entry, entry.node_name + '_data_' + entry.id_local + '.json', data):
+      entry.store_data_saved = signature
+    if write_backup and _storeDataTo(entry, entry.node_name + '_data_' + entry.id_local + '.backup.json', data):
+      entry.store_backup_saved = signature
+      entry.store_backup_time = system.time()
     return True
   except:
     logging.exception("#{id}> failed storing data".format(id = entry.id))
     return False
   finally:
-    entry.data_lock.release()
+    entry.store_write_lock.release()
     system._stats_end('storage.store_data', _s)
 
 def _storeDataTo(entry, filename, data):

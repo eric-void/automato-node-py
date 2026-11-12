@@ -81,6 +81,43 @@ class RunStepTest(NodeTestCase):
     with open(self.storage_path('test_data_counter.json')) as f:
       self.assertIn('"runs": 1', f.read())
 
+class RunStepCronTest(NodeTestCase):
+  entries = [
+    { 'module': 'scripting' },
+    {
+      'item': 'cron',
+      'publish': {
+        'cron/value': { 'run_cron': '*/5 * * * *', 'script': "publish('cron/value', 1)" },
+        'cron/invalid': { 'run_interval': 'x', 'script': "publish('cron/invalid', 1)" },
+        'cron/none': { 'script': "publish('cron/none', 1)" },
+      },
+    },
+  ]
+
+  def setUp(self):
+    super().setUp()
+    system.time_pause()
+    # 2026-11-13 00:01:00 UTC (a multiple of 60, 4 minutes before a multiple of 5 minutes)
+    system.time_set(1794528060)
+    self.patcher = mock.patch.object(node_system, 'entry_invoke_handler_threaded', side_effect = lambda entry, handler, name, *args, **kwargs: node_system.get_handler(entry, handler)(entry, *args))
+    self.patcher.start()
+
+  def tearDown(self):
+    self.patcher.stop()
+    system.time_resume()
+    super().tearDown()
+
+  def test_cron_and_invalid_interval(self):
+    with mock.patch.object(node_system, 'entry_implements', wraps = node_system.entry_implements) as implements:
+      for i in range(11 * 60):
+        node_system.run_step()
+        system.time_offset(1)
+      # The scheduling plan is computed once per entry (2 local entries: scripting and cron)
+      self.assertEqual([c.args[1] for c in implements.call_args_list], ['run', 'run'])
+    self.assertEqual(len([p for p in self.broker.published if p['topic'] == 'cron/value']), 2)
+    self.assertEqual([p for p in self.broker.published if p['topic'] != 'cron/value'], [])
+    self.assertNotIn('run_interval', self.entry('cron').definition['publish']['cron/invalid'])
+
 class EntriesImplementsTest(NodeTestCase):
   entries = [
     { 'module': 'scripting' },
