@@ -118,42 +118,69 @@ def entry_load(self_entry, entry):
 def entry_unload(self_entry, entry):
   pass
 
+# Compiled scripts cache: transforming and compiling a script is expensive (especially on slow nodes), and scripts are always the same (they come from definitions)
+_compiled_scripts = {}
+_compiled_scripts_lock = threading.Lock()
+COMPILED_SCRIPTS_MAXSIZE = 1000
+# Max seconds to wait for data lock of another entry, when a script calls (in the same thread) a script of another entry
+NESTED_ENTRY_LOCK_TIMEOUT = 10
+
+def _compile_script(code):
+  compiled = _compiled_scripts.get(code)
+  if compiled is None:
+    source = 'try:\n' + textwrap.indent(re.sub(r'^([ \t]*)return[ ]*$', r'\1_return = None; raise GeneratorExit()', re.sub(r'^([ \t]*)return[ ]+([^ ].*)$', r'\1_return = \2; raise GeneratorExit()', code, flags=re.MULTILINE), flags=re.MULTILINE), '  ') + '\nexcept GeneratorExit as _exc:\n  pass\n'
+    compiled = (compile(source, '<script>', 'exec'), source)
+    with _compiled_scripts_lock:
+      if len(_compiled_scripts) >= COMPILED_SCRIPTS_MAXSIZE:
+        _compiled_scripts.clear()
+      _compiled_scripts[code] = compiled
+  return compiled
+
 def exec_script(entry, code, *args, **kwargs):
     # WARN: Ciò che metto in "globals" nella mia exec è "read-only" (nel senso che le modifiche che verranno fatte NON si rifletteranno all'esterno)
     # Invece se modifico __locals questo si rifletterà, purchè __locals sia assegnato direttamente a entry.data. Se faccio __locals = { **entry.data } allora le modifiche non si rifletteranno più
     # Ma impostare __locals = entry.data da problemi di concorrenza (gli script e le altre routine modificano le variabili tra di loro, e storage.storeData si trova a memorizzare roba sbagliata)
     # Per questo uso un threading_local che mi permette di gestire tutto l'albero delle chiamate innestate e di avere una copia di entry.data che, alla fine di esecuzione del tree, verrà portato nell'entry.data ufficiale.
     # In questo modo funziona bene anche la condivisione dei dati tra chiamate dentro lo stesso script (la funzione1 modifica la var "a", poi chiama una sottofunzione2 che la modifica a sua volta => questo funziona solo se le 2 funzioni lavorano direttamente su entry.data)
-  
+    # Lo stato è tenuto per entry: se uno script chiama (nello stesso thread) uno script di un'altra entry, questo lavora sui dati (e con il lock) della sua entry.
+  if not hasattr(thread_data, 'running'):
+    thread_data.running = {}
+  state = thread_data.running.get(entry.id)
   acquired_lock = False
-  if not hasattr(thread_data, 'running_script') or not thread_data.running_script:
-    entry.data_lock.acquire()
-    thread_data.running_script = True
-    thread_data.locals = { ** entry.data }
-    thread_data.locals_copy = { ** entry.data }
-    acquired_lock = True
-
+  if state is None:
+    if not thread_data.running:
+      entry.data_lock.acquire()
+      acquired_lock = True
+    else:
+      # Nested call from a script of another entry: wait for the lock with a timeout (to avoid deadlocks between scripts of different entries calling each other in different threads)
+      acquired_lock = entry.data_lock.acquire(timeout = NESTED_ENTRY_LOCK_TIMEOUT)
+      if not acquired_lock:
+        logging.error("#{id}> script executed without data lock (timeout waiting for it, called by a script of another entry)".format(id = entry.id))
+    state = { 'locals': { ** entry.data }, 'locals_copy': { ** entry.data }, 'lock': acquired_lock }
+    thread_data.running[entry.id] = state
+    owner = True
+  else:
+    owner = False
+  source = code
   try:
     __globals = scripting_globals(entry, { 'args': args, **kwargs })
-    __locals = thread_data.locals
-    code = 'try:\n' + textwrap.indent(re.sub(r'^([ \t]*)return[ ]*$', r'\1_return = None; raise GeneratorExit()', re.sub(r'^([ \t]*)return[ ]+([^ ].*)$', r'\1_return = \2; raise GeneratorExit()', code, flags=re.MULTILINE), flags=re.MULTILINE), '  ') + '\nexcept GeneratorExit as _exc:\n  pass\n'
-    exec(code, __globals, __locals)
-    return __locals['_return'] if '_return' in __locals else None
-    
+    __locals = state['locals']
+    compiled, source = _compile_script(code)
+    __locals.pop('_return', None)
+    exec(compiled, __globals, __locals)
+    return __locals.pop('_return', None)
   except:
-    logging.exception('error in executing script: \n' + format_script_lines(code) + '\nargs:\n' + str(args) + '\nkwargs:\n' + str(kwargs) + '\n')
-    
+    logging.exception('error in executing script: \n' + format_script_lines(source) + '\nargs:\n' + str(args) + '\nkwargs:\n' + str(kwargs) + '\n')
   finally:
-    if acquired_lock:
-      for k in thread_data.locals_copy:
-        if thread_data.locals_copy[k] != thread_data.locals[k]:
-          #print("SET " + k + " = " + str(thread_data.locals[k]))
-          entry.data[k] = thread_data.locals[k]
-
-      del thread_data.running_script
-      del thread_data.locals
-      del thread_data.locals_copy
-      entry.data_lock.release()
+    if owner:
+      try:
+        for k in state['locals_copy']:
+          if k in state['locals'] and state['locals_copy'][k] != state['locals'][k]:
+            entry.data[k] = state['locals'][k]
+      finally:
+        del thread_data.running[entry.id]
+        if state['lock']:
+          entry.data_lock.release()
 
 def _exec_script_lambda(entry, script):
   return lambda *args, **kwargs: exec_script(entry, script, *args, **kwargs)
@@ -203,7 +230,7 @@ def decode_script(lines, store = None):
 
   if isinstance(lines, list):
     if not store and len(lines) >= 1 and lines[0] == 'py:':
-      lines = lines.pop(0)
+      lines = lines[1:]
     script = ''
     for line in lines:
       script += str(decode_script(line, {'indent': store['indent'] + '  ' if store else ''}))

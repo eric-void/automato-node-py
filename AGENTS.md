@@ -9,6 +9,7 @@ Python server/node runtime built on `../automato-core-py`. Read workspace archit
 - `storage.py`: persistent entry data.
 - `src/automato/modules/`: built-in device and service integrations (Shelly, Tasmota, Zigbee2MQTT, networking, presence, notifications, history, etc.) and adjacent tests.
 - `bin/`: service/launcher scripts and test runner.
+- `tests/`: code-oriented unit tests (no broker, the node runs with a fake one, see `tests/node_helpers.py`); `bin/unit-tests.sh` runs them with the core ones (`../automato-core-py/tests`) in the test image. The "live" module tests (`*_test.py`, `bin/docker-tests.sh`) need a broker.
 - `requirements.txt`: node/core baseline dependencies; `requirements-all.txt` and module-specific files cover optional integrations.
 
 ## Guidance

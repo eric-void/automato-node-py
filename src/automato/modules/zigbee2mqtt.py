@@ -61,7 +61,8 @@ def entry_install(installer_entry, entry, conf):
         'topic': 'zigbee2mqtt/' + str(conf["zigbee_id"]),
         'description': _('Data received by zigbee device {caption}'),
         'notify': _('Data received by zigbee device {caption} is: {{payload}}').format(caption = entry.definition['caption']),
-        #'notify_level': 'debug',
+        # Raw device data (telemetry) is frequent: keep it out of "info" notifications (and of notifications history). Set "notify_level" in the entry definition to change it.
+        'notify_level': 'debug',
         'events': {
           # channel: single | double | triple | quadruple | many | long | long_release | hold | hold_release [+ x_duration in ms] - For ikea button brightness_up | brightness_down | brightness_stop
           #   (channel is the 'action' payload, if available. If not it uses the 'click' payload)

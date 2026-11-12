@@ -10,34 +10,14 @@ import sys
 import os
 import glob
 import copy
+import signal
+import importlib
 # https://github.com/linjackson78/jstyleson
 import jstyleson
 import json
 
 from automato.node import node_system
 
-from automato.core import test
-
-from automato.core import system_test
-from automato.node import node_system_test
-from automato.modules import health_test
-from automato.modules import toggle_test
-from automato.modules import shelly_test
-from automato.modules import tasmota_test
-from automato.modules import rf_listener_test
-from automato.modules import rf2mqtt_listener_test
-from automato.modules import location_owntracks_test
-from automato.modules import net_test
-from automato.modules import net_sniffer_scapy_test
-from automato.modules import net_sniffer_test
-from automato.modules import presence_test
-from automato.modules import nodes_test
-from automato.modules import owrtwifi2mqtt_test
-from automato.modules import scheduler_test
-from automato.modules import influxdb_test
-from automato.modules import nut_test
-from automato.modules import notifications_test
-from automato.modules import telegram_test
 
 def init_base():
   global config, args
@@ -185,6 +165,8 @@ def boot():
   elif args.test:
     return boot_test()
   else:
+    # SIGTERM (procd stop, docker stop, kill) is handled like ctrl+c: node_system.run() exits and destroy() stores entries data
+    signal.signal(signal.SIGTERM, _on_sigterm)
     init_env()
     try:
       node_system.run()
@@ -197,8 +179,14 @@ def boot():
   
   return True
   
+def _on_sigterm(signum, frame):
+  # Ignore further SIGTERMs, so they don't interrupt destroy()
+  signal.signal(signal.SIGTERM, signal.SIG_IGN)
+  raise KeyboardInterrupt()
+
 def boot_test():
   global args, config
+  from automato.core import test
   
   test_config = copy.deepcopy(config)
   
@@ -210,7 +198,9 @@ def boot_test():
   
   node_system.system.test_mode = True
   
-  tests = [ system_test, node_system_test, nodes_test, health_test, toggle_test, shelly_test, tasmota_test, rf_listener_test, rf2mqtt_listener_test, location_owntracks_test, net_test, net_sniffer_scapy_test, net_sniffer_test, presence_test, owrtwifi2mqtt_test, scheduler_test, influxdb_test, nut_test, notifications_test, telegram_test ] if args.test == "*" else [ globals()[args.test] ]
+  # Test modules are imported only here (not needed, and not loaded, in normal node execution)
+  test_names = [ 'system_test', 'node_system_test', 'nodes_test', 'health_test', 'toggle_test', 'shelly_test', 'tasmota_test', 'rf_listener_test', 'rf2mqtt_listener_test', 'location_owntracks_test', 'net_test', 'net_sniffer_scapy_test', 'net_sniffer_test', 'presence_test', 'owrtwifi2mqtt_test', 'scheduler_test', 'influxdb_test', 'nut_test', 'notifications_test', 'telegram_test' ] if args.test == "*" else [ args.test ]
+  tests = [ importlib.import_module(('automato.core.' if name == 'system_test' else ('automato.node.' if name == 'node_system_test' else 'automato.modules.')) + name) for name in test_names ]
   
   success = True
   try:
@@ -237,7 +227,9 @@ def boot_test():
 
 def boot_publish():
   global args
-  node_system().system().publish(args.topic, args.payload, args.qos if args.qos != None else 0, args.retain if args.retain != None else False)
+  broker = node_system.system.broker()
+  broker.config({'publish_before_connection_policy': 'connect'})
+  broker.publish(args.topic, args.payload, args.qos if args.qos != None else 0, args.retain if args.retain != None else False)
   destroy()
   
 if __name__ == '__main__':

@@ -42,7 +42,8 @@ definition = {
   
   'run_interval': 60, # = polling interval
   
-  'notify_level': 'info',
+  # Variables are telemetry (frequent changes): notifications are "debug", except for UPS status and battery charge
+  'notify_level': 'debug',
   'topic_root': 'nut',
   'publish': {
     # Non really used for publishing topics. Load phase propagates 'reatain' and 'qos' key to other ./var/* publish definition 
@@ -61,6 +62,7 @@ definition = {
     './var/ups_status': {
       'type': 'string',
       'notify': _('Current UPS status is: {payload}'),
+      'notify_level': 'info',
       'events': {
         "connected": "js:({value: payload.indexOf('OL') >= 0 || payload.indexOf('OB') >= 0 ? 1 : 0 })",
         "output": [
@@ -102,6 +104,7 @@ definition = {
     './var/battery_charge': {
       'type': 'int',
       'notify': _('Current UPS battery charge is: {payload}%'),
+      'notify_level': 'info',
       'events': {
         "battery": "js:({value: parseInt(payload)})",
       }

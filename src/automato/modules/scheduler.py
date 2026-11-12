@@ -205,7 +205,7 @@ def run(entry):
     for jid, job in entry.data['jobs'].items():
       if job['enabled'] and ('group' not in job or job['group'] not in entry.data['groups'] or entry.data['groups'][job['group']]['enabled']):
         if job['max_delay'] > 0 and now >= job['next_run'] + job['max_delay']:
-          logging.warn('#{id}> max_delay passed, run skipped for job {job}'.format(id = entry.id, job = job))
+          logging.warning('#{id}> max_delay passed, run skipped for job {job}'.format(id = entry.id, job = job))
           job_set_next_run(job)
         if now >= job['next_run']:
           run_job(entry, job)

@@ -10,6 +10,7 @@ import importlib
 import copy
 import re
 import datetime
+import random
 from croniter import croniter
 
 from automato.core import system
@@ -26,12 +27,18 @@ def boot(config):
   system.boot()
 
 _system_initialized = False
+storage_interval = storage.STORAGE_CHECK_INTERVAL
 
 def init(_storage_fetch_data = True):
   global node_config, storage_fetch_data, threads, _system_initialized
   storage_fetch_data = _storage_fetch_data
   
   storage.init(os.path.join(node_config['base_path'], node_config['storage']))
+  global storage_interval
+  # Seconds between checks for changes in entries data (each check is a repr() of entry data: it's expensive on slow nodes)
+  storage_interval = utils.read_duration(node_config['storage_interval']) if 'storage_interval' in node_config else storage.STORAGE_CHECK_INTERVAL
+  if storage_interval <= 0:
+    storage_interval = storage.STORAGE_CHECK_INTERVAL
   
   threads = {}
   
@@ -50,21 +57,35 @@ def _on_system_initialized():
   global _system_initialized
   _system_initialized = True
 
+DESTROY_THREADS_JOIN_TIMEOUT = 10
+
 def destroy():
   global threads, _system_initialized
-  for t in threads:
-    if threads[t] and threads[t].is_alive():
-      threads[t].join()
+  # Store data first: if something below hangs (or the process is killed after a timeout), entries data is safe
+  store_all_data()
 
-  clone_entry_names = list(system.entries().keys()) # I make a clone of entry names, because some handler could change "entries"
-  for entry_id in clone_entry_names:
-    entry = system.entry_get(entry_id)
-    if entry and entry.is_local:
-      entry.store_data()
+  deadline = system.time() + DESTROY_THREADS_JOIN_TIMEOUT
+  for t in list(threads.keys()):
+    if threads[t] and threads[t].is_alive():
+      threads[t].join(max(0.1, deadline - system.time()))
+      if threads[t].is_alive():
+        logging.warning("NODE_SYSTEM> thread {t} still running at destroy, ignoring it".format(t = t))
+
+  store_all_data()
   
   storage.destroy()
   system.destroy()
   _system_initialized = False
+
+def store_all_data(timeout = 5):
+  """
+  Store data of all local entries (blocking, but waiting at most "timeout" seconds for each entry lock)
+  """
+  clone_entry_names = list(system.entries().keys()) # I make a clone of entry names, because some handler could change "entries"
+  for entry_id in clone_entry_names:
+    entry = system.entry_get(entry_id)
+    if entry and entry.is_local and hasattr(entry, 'store_data'):
+      entry.store_data(True, timeout)
 
 def _on_system_entry_load(entry):
   global storage_fetch_data #, node_name
@@ -141,7 +162,7 @@ def _on_system_entry_load_batch(loading_defs):
           # WARN: Usually ALL previously loaded and initialized entries should be in previously_loaded_entries_to_reload (for the rule above, if i'm loading and entry with entry_load method, this invalidates all previously loaded entries), so the condition below should skip all of these entries. The only exception happens if the presence of "entry_load" method changes between the code above and the code below (for example, the "entry_load" method is defined by the scripting module via scripting.entry_load)
           # In this situation, entry.entry_load(other_entry) is called, even if it's already called before (by a previous "entry" version). We print a warning about this. (It's not convenient to invalidate the entry now)
           if other_entry.loaded and other_entry.id not in previously_loaded_entries_to_reload:
-            logging.warn("NODE_SYSTEM> Calling {eid}.entry_load on {eid2}, but {eid2} has not been reloaded (during the reloading check {eid}.entry_load was not present). So it's possibile {eid}.entry_load has been called before on {eid2} (by a previous {eid} version).".format(eid = entry.id, eid2 = other_entry.id))
+            logging.warning("NODE_SYSTEM> Calling {eid}.entry_load on {eid2}, but {eid2} has not been reloaded (during the reloading check {eid}.entry_load was not present). So it's possibile {eid}.entry_load has been called before on {eid2} (by a previous {eid} version).".format(eid = entry.id, eid2 = other_entry.id))
           entry_invoke(entry, 'entry_load', other_entry)
 
   for entry in loading_defs.values():
@@ -162,7 +183,7 @@ def _on_system_entry_load_batch(loading_defs):
             # WARN: Usually ALL previously loaded and initialized entries (matching the install_on rule) should be in previously_loaded_entries_to_reload (for the rule above), so the condition below should skip all of these entries. The only exception happens if the presence of "entry_install" method, or the install_rule, changes between the code above and the code below (for example, the "entry_install" method is defined by the scripting module via scripting.entry_load)
             # In this situation, entry.entry_install(other_entry) is called, even if it's already called before (by a previous "entry" version). We print a warning about this. (It's not convenient to invalidate the entry now)
             if other_entry.loaded and other_entry.id not in previously_loaded_entries_to_reload:
-              logging.warn("NODE_SYSTEM> Calling {eid}.entry_install on {eid2}, but {eid2} has not been reloaded (during the reloading check {eid}.entry_install was not present or the install rule was different). So it's possibile {eid}.entry_install has been called before on {eid2} (by a previous {eid} version).".format(eid = entry.id, eid2 = other_entry.id))
+              logging.warning("NODE_SYSTEM> Calling {eid}.entry_install on {eid2}, but {eid2} has not been reloaded (during the reloading check {eid}.entry_install was not present or the install rule was different). So it's possibile {eid}.entry_install has been called before on {eid2} (by a previous {eid} version).".format(eid = entry.id, eid2 = other_entry.id))
             entry_invoke(entry, 'entry_install', other_entry, conf)
 
   return previously_loaded_entries_to_reload
@@ -228,7 +249,7 @@ def _on_system_entry_unload(entry):
       for eid, eentry in system.entries().items():
         entry.module.entry_unload(entry, eentry)
     # if this entry define an "entry_uninstall" hook, all previous entries matching install rules should be passed to it
-    if entry.type == 'module' and hasattr(entry.module, 'entry_uninstall'):
+    if entry.type == 'module' and hasattr(entry.module, 'entry_uninstall') and 'install_on' in entry.definition:
       for eid, eentry in system.entries().items():
         conf = _entry_install_on_conf(entry, entry.definition['install_on'], eentry)
         if conf:
@@ -266,7 +287,7 @@ def _on_system_entries_change(entry_ids_loaded, entry_ids_unloaded):
   global system_entries_to_reload
   antiflood = 5
   while system_entries_to_reload and antiflood > 0:
-    logging.warn("NODE_SYSTEM> An entry just loaded need to install over previous entries, reloading them: {e}".format(e = system_entries_to_reload))
+    logging.warning("NODE_SYSTEM> An entry just loaded need to install over previous entries, reloading them: {e}".format(e = system_entries_to_reload))
     system_entries_to_reload2 = system_entries_to_reload
     system_entries_to_reload = []
     for entry_id in system_entries_to_reload2:
@@ -275,6 +296,9 @@ def _on_system_entries_change(entry_ids_loaded, entry_ids_unloaded):
     if antiflood == 0:
       logging.error("ANTIFLOOD!")
   """
+  global entries_implementations
+  # Entries changed: cached lists of entries implementing a method are invalid (they could contain unloaded entries)
+  entries_implementations = {}
   entries_invoke_threaded('system_entries_change', entry_ids_loaded, entry_ids_unloaded)
 
 def _on_system_message(message):
@@ -318,7 +342,7 @@ def _run_step_throttle_policy(entry, definition, topic_rule = None):
   Return throttle policy for a specific execution handler ("run" method or "topic_rule" publisher)
   """
   level = load_level()
-  throttle_policy = 'force' if level <= 0 else ('skip' if level >= 3 else (definition['run_throttle'] if 'run_thottle' in definition else ('skip' if entry.data['next_run' + (('_' + topic_rule) if topic_rule else '')] - entry.data['last_run' + (('_' + topic_rule) if topic_rule else '')] < 3600 else 'wait')))
+  throttle_policy = 'force' if level <= 0 else ('skip' if level >= 3 else (definition['run_throttle'] if 'run_throttle' in definition else ('skip' if entry.data['next_run' + (('_' + topic_rule) if topic_rule else '')] - entry.data['last_run' + (('_' + topic_rule) if topic_rule else '')] < 3600 else 'wait')))
   
   if isinstance(throttle_policy, list):
     throttle_policy = throttle_policy[0 if level == 1 else 1]
@@ -418,7 +442,7 @@ def run_step():
                 logging.debug("#{entry}> system overload ({load}), postponed invokation of publish {method}.".format(entry=entry.id, load = load_level(), method=topic_rule))
 
       _s1 = system._stats_start()
-      entry.store_data(False)
+      storage.storeDataIfDue(entry, now, storage_interval)
       system._stats_end('node.run.store_data', _s1)
   system._stats_end('node.run', _s)
 
@@ -505,7 +529,7 @@ def entry_invoke(entry, method, *args, **kwargs):
   
   func = get_handler(entry, method)
   if func:
-    logging.debug("#{entry}> invoking {method} ...".format(entry=entry.id, method=method))
+    logging.debug("#%s> invoking %s ...", entry.id, method)
     ret = None
     try:
       ret = func(entry, *args, **kwargs)
@@ -553,7 +577,7 @@ def entries_invoke(method, *args, _skip_entry_id = False, **kwargs):
     if not _skip_entry_id or entry_id != _skip_entry_id:
       func = get_handler(entry, method)
       if func:
-        logging.debug("#{entry}> invoking {method} ...".format(entry = entry_id, method = method))
+        logging.debug("#%s> invoking %s ...", entry_id, method)
         try:
           ret = func(entry, *args, **kwargs)
         except:
@@ -584,13 +608,13 @@ def entry_invoke_threaded(entry, method, *args, **kwargs):
       del kwargs['_thread_multiple']
       
     if thread_key not in threads or threads[thread_key] is None or not threads[thread_key].is_alive():
-      logging.debug("#{entry}> invoking {method} (threaded) ...".format(entry=entry.id, method=method))
+      logging.debug("#%s> invoking %s (threaded) ...", entry.id, method)
       args = [func, method, entry.id, entry] + list(args);
       # https://docs.python.org/3/library/threading.html
       threads[thread_key] = threading.Thread(target=entry_invoke_threaded_wrapper, args=args, kwargs=kwargs, daemon = True) # daemon = True allows the main application to exit even though the thread is running. It will also (therefore) make it possible to use ctrl+c to terminate the application
       threads[thread_key].start()
     else:
-      logging.warn("#{entry}> skipped invocation of {method}: already running!".format(entry=entry.id, method=method))
+      logging.warning("#{entry}> skipped invocation of {method}: already running!".format(entry=entry.id, method=method))
 
 def entries_invoke_threaded(method, *args, **kwargs):
   global entries, threads
@@ -599,13 +623,13 @@ def entries_invoke_threaded(method, *args, **kwargs):
     func = get_handler(entry, method)
     if func:
       if (entry.id + '.' + method) not in threads or threads[entry.id + '.' + method] is None or not threads[entry.id + '.' + method].is_alive():
-        logging.debug("#{entry}> invoking {method} (threaded) ...".format(entry = entry.id, method = method))
+        logging.debug("#%s> invoking %s (threaded) ...", entry.id, method)
         # https://docs.python.org/3/library/threading.html
         cargs = [func, method, entry_id, entry] + list(args)
         threads[entry.id + '.' + method] = threading.Thread(target=entry_invoke_threaded_wrapper, args=cargs, kwargs=kwargs, daemon = True) # daemon = True allows the main application to exit even though the thread is running. It will also (therefore) make it possible to use ctrl+c to terminate the application
         threads[entry.id + '.' + method].start()
       else:
-        logging.warn("#{entry}> skipped invocation of {method}: already running!".format(entry=entry.id, method=method))
+        logging.warning("#{entry}> skipped invocation of {method}: already running!".format(entry=entry.id, method=method))
 
 # wrapper for threads invokation, used to catch and log exception
 def entry_invoke_threaded_wrapper(func, method, entry_id, *args, **kwargs):
@@ -662,10 +686,15 @@ def _entry_invoke_publish_thread_init(entry, topic_rule, topic_definition):
 
 def entry_invoke_handler_threaded(entry, handler_param, handler_name, *args, **kwargs):
   if isinstance(entry, str):
-    entry = system.entry_get(entry)
-  handler = get_handler(entry, handler_param) if entry else None
+    entry_str = entry
+    entry = system.entry_get(entry_str)
+    if not entry:
+      logging.error("#NODE_SYSTEM> skipped invocation of handler {handler}: entry {entry} not found!".format(entry = entry_str, handler = handler_name))
+      return False
+  handler = get_handler(entry, handler_param)
   if not handler:
     logging.error("#{entry}> handler not found: {handler}".format(entry = entry.id, handler = handler_param))
+    return False
     
   thread_key = entry.id + '.' + handler_name
   if '_thread_key' in kwargs:
@@ -676,10 +705,10 @@ def entry_invoke_handler_threaded(entry, handler_param, handler_name, *args, **k
     del kwargs['_thread_multiple']
     
   if thread_key not in threads or threads[thread_key] is None or not threads[thread_key].is_alive():
-    logging.debug("#{entry}> invoking handler {method} (threaded) ...".format(entry = entry.id, method = handler_name))
+    logging.debug("#%s> invoking handler %s (threaded) ...", entry.id, handler_name)
     args = [handler, handler_name, entry.id, entry] + list(args);
     # https://docs.python.org/3/library/threading.html
     threads[thread_key] = threading.Thread(target=entry_invoke_threaded_wrapper, args=args, kwargs=kwargs, daemon = True) # daemon = True allows the main application to exit even though the thread is running. It will also (therefore) make it possible to use ctrl+c to terminate the application
     threads[thread_key].start()
   else:
-    logging.warn("#{entry}> skipped invocation of {method}: already running!".format(entry = entry.id, method = handler_name))
+    logging.warning("#{entry}> skipped invocation of {method}: already running!".format(entry = entry.id, method = handler_name))

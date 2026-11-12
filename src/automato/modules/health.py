@@ -228,47 +228,52 @@ def _health_checker_timer(entry):
   health_disable_load_level = 0
   
   while not threading.currentThread()._destroyed:
-    now = system.time()
+    try:
+      now = system.time()
     
-    if node.load_level() > 0:
-      health_disable_load_level = now
-    elif health_disable_load_level > 0 and node.load_level() == 0 and now - health_disable_load_level > 60:
-      health_disable_load_level = 0
-      # if a moment ago the system was too load, and now is ok, i must consider health_dead_checker and health_publish_checker data as invalid and reset them (or i'll report a lot of fake health problems)
+      if node.load_level() > 0:
+        health_disable_load_level = now
+      elif health_disable_load_level > 0 and node.load_level() == 0 and now - health_disable_load_level > 60:
+        health_disable_load_level = 0
+        # if a moment ago the system was too load, and now is ok, i must consider health_dead_checker and health_publish_checker data as invalid and reset them (or i'll report a lot of fake health problems)
     
-    if health_disable_load_level > 0:
-      # health_dead_checker
-      for entry_id in entry.health_dead_checker:
-        source_entry = system.entry_get(entry_id)
-        if source_entry:
-          entry.health_dead_checker[entry_id] = (system.time() + entry.health_dead_checker[entry_id][1], entry.health_dead_checker[entry_id][1], entry.health_dead_checker[entry_id][2])
-
-      # health_publish_checker
-      for t in entry.health_publish_checker:
-        for e in entry.health_publish_checker[t]:
-          if entry.health_publish_checker[t][e]['last_published'] > 0:
-            entry.health_publish_checker[t][e]['last_published'] = system.time()
-    
-    else:
-      # health_dead_checker
-      timeouts = [ entry_id for entry_id in entry.health_dead_checker if now > entry.health_dead_checker[entry_id][0] ]
-      if timeouts:
-        for entry_id in timeouts:
+      if health_disable_load_level > 0:
+        # health_dead_checker
+        for entry_id in list(entry.health_dead_checker):
           source_entry = system.entry_get(entry_id)
           if source_entry:
-            source_entry.health_dead = entry.health_dead_checker[entry_id][2]
-            check_health_status(entry, source_entry)
-        entry.health_dead_checker = { entry_id: entry.health_dead_checker[entry_id] for entry_id in entry.health_dead_checker if entry_id not in timeouts }
+            entry.health_dead_checker[entry_id] = (system.time() + entry.health_dead_checker[entry_id][1], entry.health_dead_checker[entry_id][1], entry.health_dead_checker[entry_id][2])
+
+        # health_publish_checker
+        for t in list(entry.health_publish_checker):
+          for e in list(entry.health_publish_checker[t]):
+            if entry.health_publish_checker[t][e]['last_published'] > 0:
+              entry.health_publish_checker[t][e]['last_published'] = system.time()
+    
+      else:
+        # health_dead_checker
+        timeouts = [ entry_id for entry_id in list(entry.health_dead_checker) if now > entry.health_dead_checker[entry_id][0] ]
+        if timeouts:
+          for entry_id in timeouts:
+            source_entry = system.entry_get(entry_id)
+            if source_entry:
+              source_entry.health_dead = entry.health_dead_checker[entry_id][2]
+              check_health_status(entry, source_entry)
+          entry.health_dead_checker = { entry_id: entry.health_dead_checker[entry_id] for entry_id in entry.health_dead_checker if entry_id not in timeouts }
       
-      # health_publish_checker
-      delay = system.broker().queueDelay() * 2 if not system.test_mode else 0
-      for t in entry.health_publish_checker:
-        for e in entry.health_publish_checker[t]:
-          if entry.health_publish_checker[t][e]['last_published'] > 0 and now - entry.health_publish_checker[t][e]['last_published'] > entry.health_publish_checker[t][e]['interval'] + delay:
-            target_entry = system.entry_get(e)
-            if target_entry and t not in target_entry.health_publish:
-              target_entry.health_publish[t] = [now, entry.health_publish_checker[t][e]['last_published'], entry.health_publish_checker[t][e]['interval'], delay]
-              check_health_status(entry, target_entry)
+        # health_publish_checker
+        delay = system.broker().queueDelay() * 2 if not system.test_mode else 0
+        for t in list(entry.health_publish_checker):
+          for e in list(entry.health_publish_checker[t]):
+            if entry.health_publish_checker[t][e]['last_published'] > 0 and now - entry.health_publish_checker[t][e]['last_published'] > entry.health_publish_checker[t][e]['interval'] + delay:
+              target_entry = system.entry_get(e)
+              if target_entry and t not in target_entry.health_publish:
+                target_entry.health_publish[t] = [now, entry.health_publish_checker[t][e]['last_published'], entry.health_publish_checker[t][e]['interval'], delay]
+                check_health_status(entry, target_entry)
+
+    except:
+      # This thread must never die (health checks would stop silently)
+      logging.exception("HEALTH> error in health checker")
 
     system.sleep(entry.config['health-checker-secs'])
 
@@ -337,7 +342,7 @@ def on_no_response_to_subscribed_message(installer_entry, entry, id, response_to
 
 def event_health_for_requirement(self_entry, source_entry, eventname, eventdata, caller, published_message, required_by_entry):
   m = system.current_received_message()
-  if m.retain: # health events from retained messages should be skipped
+  if m and m.retain: # health events from retained messages should be skipped (m is None for events not generated by a received message, like events groups)
     return
   
   """
