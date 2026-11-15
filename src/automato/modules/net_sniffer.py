@@ -6,6 +6,7 @@ import threading
 import subprocess
 import os
 import re
+import ipaddress
 
 from automato.core import system
 from automato.core import utils
@@ -23,6 +24,7 @@ definition = {
     'momentary_flood_time': 30, # Used for devices with net_connection_momentary flag set, if a connection is detected within this time from the previous connection, it's ignored
     'connection_time': '15m', # If a connected device is no more detected after this time, it's considered disconnected
     'send_connect_message_every': '10m', # If a device is connected, resend a connect message on this interval (set to 0 to disable)
+    'disconnect_grace_time': '1m', # After a disconnection detected with confidence by an event monitor (like "iw event"), connections detected by other handlers are ignored for this time (the neighbours table keeps a REACHABLE entry for a while after a device is gone). Set to 0 to disable
     'confidence_timeout': '15m', # After a connection with confidence detected (via method or PING), we consider the device as detected with confidence for this period (= no other ping will be made)
     
     # The 3 options below could also be an array of handlers, or None/False to disable that handler. For event_monitor or polling_handler you can user "HANDLERNAME+ping" if you want to ping connected devices with no confidence about real presence. (Overriden by entry.definition['net_sniffer_ping'], and considering config['confidence_timeout'] or entry.definition['net_sniffer_confidence_timeout'])
@@ -113,7 +115,7 @@ def destroy(installer_entry):
   installer_entry.thread_polling.join()
 
 def entry_install(installer_entry, entry, conf):
-  installer_entry.net_sniffer_mac_addresses[conf['mac_address'].upper()] = { 'entry_id': entry.id, 'momentary': 'net_connection_momentary' in conf and conf['net_connection_momentary'], 'connected': False, 'last_seen': 0, 'last_seen_confidence': 0, 'last_published': 0, 'last_ip_address': None}
+  installer_entry.net_sniffer_mac_addresses[conf['mac_address'].upper()] = { 'entry_id': entry.id, 'momentary': 'net_connection_momentary' in conf and conf['net_connection_momentary'], 'connected': False, 'last_seen': 0, 'last_seen_confidence': 0, 'last_published': 0, 'last_ip_address': None, 'disconnected_by_event': 0}
 
   required = entry.definition['required'] if 'required' in entry.definition else []
   required.append(installer_entry.id)
@@ -159,6 +161,18 @@ def run(installer_entry):
   for h in installer_entry.net_sniffer_polling_handlers:
     installer_entry.net_sniffer_all_handlers[h]['polling_callable'](installer_entry, installer_entry.net_sniffer_all_handlers[h], env)
 
+_CGNAT_NETWORK = ipaddress.ip_network('100.64.0.0/10')
+
+def ip_address_usable(ip_address):
+  """
+  True if ip_address is a valid IPv4 address of a local network. Addresses in 100.64.0.0/10 (CGNAT / Tailscale), loopback and link-local ones are not: a ping to them can be answered even if the device is not on the local network
+  """
+  try:
+    ip = ipaddress.ip_address(ip_address)
+  except ValueError:
+    return False
+  return ip.version == 4 and ip not in _CGNAT_NETWORK and not (ip.is_loopback or ip.is_link_local or ip.is_unspecified or ip.is_multicast)
+
 """
 @param confidence: True if the device is surely present (no PING needed), False if the device is probably present (but a PING is advisable)
 @param ip_address: Only ipv4 address, set to None if the method could not obtain the ip address
@@ -167,6 +181,10 @@ def run(installer_entry):
 """
 def mac_address_detected(installer_entry, env, mac_address, connected = True, confidence = False, ip_address = None, handler = None, event_monitor = False):
   if mac_address in installer_entry.net_sniffer_mac_addresses:
+    if ip_address and not ip_address_usable(ip_address):
+      ip_address = None
+    if connected and not event_monitor and system.time() - installer_entry.net_sniffer_mac_addresses[mac_address].get('disconnected_by_event', 0) < utils.read_duration(installer_entry.config['disconnect_grace_time']):
+      return
     if ip_address:
       ip_address_set(env, mac_address, ip_address)
     entry = system.entry_get(installer_entry.net_sniffer_mac_addresses[mac_address]['entry_id'])
@@ -215,6 +233,8 @@ def mac_address_detected(installer_entry, env, mac_address, connected = True, co
         installer_entry.net_sniffer_mac_addresses[mac_address]['connected'] = False
         publish = '@/disconnected'
         ip_address = None
+        if confidence and event_monitor:
+          installer_entry.net_sniffer_mac_addresses[mac_address]['disconnected_by_event'] = system.time()
       elif installer_entry.config['send_connect_message_every'] and connected and system.time() - installer_entry.net_sniffer_mac_addresses[mac_address]['last_published'] >= utils.read_duration(installer_entry.config['send_connect_message_every']):
         publish = '@/connected'
         if not ip_address and installer_entry.net_sniffer_mac_addresses[mac_address]['last_ip_address']:
@@ -355,8 +375,13 @@ def _arp_list(installer_entry):
   with open(installer_entry.config['arp_location'], 'r') as f:
     output = f.read()
   for line in output.split("\n"):
-    r = _arp_process_line(line.strip())
-    if r:
+    line = line.strip()
+    # Flags 0x0 = incomplete entry (the device is not answering)
+    if re.match(r'^[0-9.]+\s+0x[0-9a-f]+\s+0x0\s', line, re.IGNORECASE):
+      continue
+    r = _arp_process_line(line)
+    # A device could have more addresses (for example the ones of an overlay network): only a usable one is returned
+    if r and r[1] and ip_address_usable(r[1]):
       ret[r[0]] = r[1]
   return ret
 
@@ -395,7 +420,7 @@ def ip_neigh_ip_get(installer_entry, env, mac_address):
     result = subprocess.check_output(installer_entry.config['ip_neigh_command'], shell=True, stderr=subprocess.STDOUT).decode("utf-8")
     for line in result.split("\n"):
       r = __ip_neigh_process_line(line)
-      if r['ipv4']:
+      if r and r['ipv4'] and r['mac_address'] and ip_address_usable(r['ipv4']):
         env['ip_neigh_list'][r['mac_address']] = r['ipv4']
   if mac_address in env['ip_neigh_list']:
     return env['ip_neigh_list'][mac_address]
