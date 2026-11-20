@@ -1,5 +1,7 @@
-# 3.13 is the default (sauron, limited by Js2Py); golconda runs 3.11, so
-# the test image can also be built with --build-arg PYTHON_VERSION=3.11.
+# 3.13 is the default (sauron, limited by Js2Py, the default scripting engine);
+# golconda runs 3.11, so the test image can also be built with
+# --build-arg PYTHON_VERSION=3.11. Both scripting engines are installed
+# (Js2Py and QuickJS, "scripting-engine" in the node configuration).
 ARG PYTHON_VERSION=3.13
 FROM python:${PYTHON_VERSION}-slim
 
@@ -16,7 +18,7 @@ RUN apt-get update \
     && mkdir -p /etc/automato /var/lib/automato /var/log/automato
 
 WORKDIR /opt/automato
-COPY automato-core-py/requirements.txt /opt/automato/automato-core-py/requirements.txt
+COPY automato-core-py/requirements.txt automato-core-py/requirements-quickjs.txt /opt/automato/automato-core-py/
 COPY automato-core-py/src /opt/automato/automato-core-py/src
 COPY automato-node-py /opt/automato/automato-node-py
 
@@ -26,8 +28,9 @@ WORKDIR /opt/automato/automato-node-py
 RUN pip install --no-cache-dir 'Js2Py @ git+https://github.com/a-j-albert/Js2Py.git@cc64a715727f110b79310b8031e0ade9c501d5d3' \
     && pip install --no-cache-dir -r requirements-all.txt \
     && pip install --no-cache-dir -r /opt/automato/automato-core-py/requirements.txt \
+    && pip install --no-cache-dir -r /opt/automato/automato-core-py/requirements-quickjs.txt \
     && pip install --no-cache-dir selenium pygsheets \
-    && python -c "import js2py; from PyNUTClient import PyNUT; import solaredge_modbus, telegram.ext; js2py.eval_js('1 + 1')"
+    && python -c "import js2py, quickjs; from PyNUTClient import PyNUT; import solaredge_modbus, telegram.ext; js2py.eval_js('1 + 1'); quickjs.Context().eval('1 + 1')"
 
 ENV PYTHONPATH=/opt/automato/automato-node-py/src:/opt/automato/automato-core-py/src
 USER automato:automato

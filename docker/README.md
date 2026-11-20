@@ -1,7 +1,8 @@
 # Automato Node in Docker
 
 The image runs the node on Python 3.13 and uses the Js2Py fork/patch currently
-needed by Automato on Python versions after 3.11. It connects to the MQTT
+needed by Automato on Python versions after 3.11; it also has QuickJS, the other
+scripting engine (`"scripting-engine": "quickjs"`). It connects to the MQTT
 broker configured in `automato.conf`; it does not start a broker.
 
 ## Build and run with Compose

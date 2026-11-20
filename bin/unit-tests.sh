@@ -6,6 +6,7 @@
 #   bin/unit-tests.sh                      # python 3.13
 #   PYTHON_VERSION=3.11 bin/unit-tests.sh  # python 3.11 (golconda version)
 #   bin/unit-tests.sh --local              # local python (dependencies must be installed)
+#   AUTOMATO_SCRIPTING_ENGINE=quickjs bin/unit-tests.sh  # JavaScript snippets on QuickJS (default: js2py)
 # Other arguments are passed to "python -m unittest discover" (e.g. -v, -k pattern).
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -28,5 +29,5 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   echo "Image $IMAGE not found: build it with PYTHON_VERSION=${PYTHON_VERSION:-3.13} bin/docker-tests.sh (or use --local)" >&2
   exit 2
 fi
-exec docker run --rm -e TZ=Europe/Rome -v "$ROOT/automato-core-py:/w/automato-core-py:ro" -v "$ROOT/automato-node-py:/w/automato-node-py:ro" \
+exec docker run --rm -e TZ=Europe/Rome -e AUTOMATO_SCRIPTING_ENGINE -v "$ROOT/automato-core-py:/w/automato-core-py:ro" -v "$ROOT/automato-node-py:/w/automato-node-py:ro" \
   --entrypoint /w/automato-node-py/bin/unit-tests.sh "$IMAGE" --inside "$@"

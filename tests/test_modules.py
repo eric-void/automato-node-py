@@ -98,6 +98,38 @@ class ZigbeeNotificationsTest(NodeTestCase):
     # The level can be changed in the entry definition
     self.assertEqual(system.entry_get('z_plug').definition['publish']['zigbee2mqtt/plug1']['notify_level'], 'info')
 
+class ZigbeeEventsTest(NodeTestCase):
+  entries = [
+    { 'module': 'zigbee2mqtt' },
+    { 'device': 'z_door', 'caption': 'Door', 'device_type': 'zigbee_contact', 'zigbee_id': 'door1' },
+    { 'device': 'z_presence', 'caption': 'Presence', 'device_type': 'zigbee_presence', 'zigbee_id': 'presence1' },
+    { 'device': 'z_button', 'caption': 'Button', 'device_type': 'zigbee_button', 'zigbee_id': 'button1' },
+  ]
+
+  def capture(self, entry_id, eventname):
+    events = []
+    # Without the ":init" params (value:def, ...)
+    system.on_event(entry_id + '.' + eventname, lambda entry, eventname, eventdata, caller, pm: events.append({k: v for k, v in eventdata['params'].items() if ':' not in k}), self.entry(entry_id))
+    return events
+
+  def test_contact_input_events(self):
+    # The "contact" and "contact-open" input channels never fired: the type check was 'typeof payload == "contact"'
+    inputs, contact = self.capture('z_door', 'input'), self.capture('z_door', 'contact')
+    self.receive('zigbee2mqtt/door1', {'contact': False, 'battery': 90})
+    self.assertIn({'value': 0, 'channel': 'contact'}, inputs)
+    self.assertIn({'value': 1, 'channel': 'contact-open'}, inputs)
+    self.assertEqual(contact, [{'value': 0}])
+
+  def test_occupancy_input_event(self):
+    inputs = self.capture('z_presence', 'input')
+    self.receive('zigbee2mqtt/presence1', {'occupancy': True, 'illuminance': 95})
+    self.assertEqual(inputs, [{'value': 1, 'channel': 'occupancy'}])
+
+  def test_button_input_event(self):
+    inputs = self.capture('z_button', 'input')
+    self.receive('zigbee2mqtt/button1', {'action': 'single', 'battery': 100})
+    self.assertEqual(inputs, [{'value': 1, 'temporary': True, 'channel': 'single', 'x_duration': -1}])
+
 class ScriptingTest(NodeTestCase):
   entries = [
     { 'module': 'scripting' },

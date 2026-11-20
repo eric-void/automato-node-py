@@ -33,6 +33,18 @@ The core evaluates the expressions of definitions with Js2Py. The PyPI release d
 pip install 'Js2Py @ git+https://github.com/a-j-albert/Js2Py.git@cc64a715727f110b79310b8031e0ade9c501d5d3'
 ```
 
+### QuickJS scripting engine
+
+Js2Py is the default engine; QuickJS is faster and works on every Python version (`"scripting-engine": "quickjs"` in the configuration, see [Node configuration](configuration.md#keys)). It needs the `quickjs-ng` package:
+
+```sh
+pip install -r automato-core-py/requirements-quickjs.txt
+```
+
+PyPI has wheels for Linux x86_64/aarch64, Windows and macOS, not for OpenWrt armv7, which has no compiler: build the wheel on a PC and copy it to the node (see [On OpenWrt](#quickjs-on-openwrt)).
+
+At startup the node logs `scripting_js> scripting engine: quickjs` (or `js2py`). If the configured engine cannot be loaded (for example `quickjs-ng` is not installed) it logs an error and uses the other one, so the node starts anyway. To switch back, set `"scripting-engine": "js2py"` and restart: keep Js2Py installed as long as you want to be able to do it.
+
 Modules with external dependencies have their own requirements file, next to the module: `src/automato/modules/<module>-requirements.txt`. Install only the ones you use, or all of them with:
 
 ```sh
@@ -87,11 +99,28 @@ The user must be able to write the storage and log paths of the configuration.
 /etc/init.d/automato start
 ```
 
-On a router CPU and memory are limited: keep `listen_all_events` off, prefer `log-level: info`, and run heavy modules (history, InfluxDB, Telegram) on another node.
+On a router CPU and memory are limited: keep `listen_all_events` off, prefer `log-level: info`, use the [QuickJS engine](#quickjs-scripting-engine) (about 3 times faster than Js2Py on an armv7 router), and run heavy modules (history, InfluxDB, Telegram) on another node.
+
+### QuickJS on OpenWrt
+
+PyPI has no `quickjs-ng` wheel for armv7 and the router has no compiler. [bin/build-quickjs-wheel.sh](../bin/build-quickjs-wheel.sh) builds it on a PC with Docker, in an Alpine container (musl, as OpenWrt). For a foreign architecture the PC needs qemu user emulation (Arch Linux: `pacman -S qemu-user-static qemu-user-static-binfmt`, then `systemctl restart systemd-binfmt`). The wheel is abi3: one file for every Python >= 3.10.
+
+```sh
+# on the PC (a few minutes under emulation; PLATFORM=linux/arm64 for an aarch64 router)
+automato-node-py/bin/build-quickjs-wheel.sh dist
+scp dist/quickjs_ng-*-linux_armv7l.whl root@router:/tmp/
+
+# on the router (about 750 KB in the overlay; --no-cache-dir keeps pip's cache out of the flash)
+pip3 install --no-deps --no-cache-dir /tmp/quickjs_ng-*-linux_armv7l.whl
+python3 -c "import quickjs; print(quickjs.Context().eval('[1, 2].map(x => x * 2)').json())"
+rm /tmp/quickjs_ng-*.whl
+```
+
+Then set `"scripting-engine": "quickjs"` in the configuration and restart the node (`/etc/init.d/automato restart`); the log must show `scripting_js> scripting engine: quickjs`. Add the wheel to the list of packages to reinstall after a firmware upgrade.
 
 ## With Docker
 
-The [Dockerfile](../Dockerfile) builds an image with the node, the core and all the module dependencies (Python 3.13, Js2Py fork included). It is built from the directory that contains both checkouts:
+The [Dockerfile](../Dockerfile) builds an image with the node, the core and all the module dependencies (Python 3.13, both scripting engines: Js2Py fork and QuickJS). It is built from the directory that contains both checkouts:
 
 ```sh
 docker build -f automato-node-py/Dockerfile -t automato-node:local .

@@ -71,12 +71,12 @@ def entry_install(installer_entry, entry, conf):
             'js:( (typeof payload == "object") && "action" in payload ? { value: 1, temporary: true, channel: payload["action"], "x_duration": "duration" in payload ? payload["duration"] : -1} : ' +
               '( (typeof payload == "object") && "click" in payload ? { value: 1, temporary: true, channel: payload["click"], "x_duration": "duration" in payload ? payload["duration"] : -1} : ' +
               '( (typeof payload == "object") && "water_leak" in payload ? { value: payload["water_leak"] ? 1 : 0, channel: "water-leak" } : ' +
-              '( (typeof payload == "occupancy") && "occupancy" in payload ? { value: payload["occupancy"] ? 1 : 0, channel: "occupancy" } : ' +
-              '( (typeof payload == "contact") && "contact" in payload ? { value: payload["contact"] ? 1 : 0, channel: "contact" } : ' +
+              '( (typeof payload == "object") && "occupancy" in payload ? { value: payload["occupancy"] ? 1 : 0, channel: "occupancy" } : ' +
+              '( (typeof payload == "object") && "contact" in payload ? { value: payload["contact"] ? 1 : 0, channel: "contact" } : ' +
               'null)))))',
-            'js:( (typeof payload == "contact") && "contact" in payload ? { value: payload["contact"] ? 0 : 1, channel: "contact-open" } : null)',
+            'js:( (typeof payload == "object") && "contact" in payload ? { value: payload["contact"] ? 0 : 1, channel: "contact-open" } : null)',
           ],
-          'input:init': { 'value:def': [0, 1], 'channel:def': ['single', 'double', 'triple', 'quadruple', 'many', 'long', 'water-leak', 'hold', 'release' ], 'duration:def': 'int' },
+          'input:init': { 'value:def': [0, 1], 'channel:def': ['single', 'double', 'triple', 'quadruple', 'many', 'long', 'water-leak', 'hold', 'release', 'occupancy', 'contact', 'contact-open' ], 'duration:def': 'int' },
           'temperature': 'js:((typeof payload == "object") && "temperature" in payload ? { value: payload["temperature"] } : null)',
           'temperature:init': { 'value:unit': '°C' },
           'humidity': 'js:((typeof payload == "object") && "humidity" in payload ? { value: payload["humidity"] } : null)',

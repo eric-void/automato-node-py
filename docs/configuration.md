@@ -62,6 +62,7 @@ Merge rule: top level lists are concatenated (so every file can add `entries`), 
 | `color-log` | `false` | Colors on a terminal |
 | `log-level` | `debug` | `debug`, `info`, `warning`, `error`. `info` saves CPU on slow nodes |
 | `stats-detailed` | `false` | Collect timing statistics per topic (printed at exit) |
+| `scripting-engine` | `js2py` | Engine for the JavaScript snippets of definitions: `js2py` or `quickjs` (faster, needs the quickjs-ng package, see [Installation](installation.md#quickjs-scripting-engine)). If it cannot be loaded the node logs an error and uses the other one. Details in [scripting](https://github.com/eric-void/automato-core-py/blob/master/docs/scripting.md#engines-of-the-python-core) |
 
 ### MQTT
 
@@ -85,6 +86,7 @@ Keep credentials out of shared files: a separate included file (`conf.d/00-secre
 | `AUTOMATO_STORAGE_DIR` | Overrides `storage` |
 | `AUTOMATO_LOG_DIR` | Moves `log`, `error-log`, `messages-log` and `debug-log` into this directory (keeping their file names) |
 | `TZ` | Time zone of the node: cron rules and local times use it |
+| `AUTOMATO_SCRIPTING_ENGINE` | Default of `scripting-engine`, when the configuration does not set it (used by the tests) |
 
 They are used by the Docker image; include paths and local modules still resolve from the configuration directory.
 
